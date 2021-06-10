@@ -51,6 +51,16 @@ local del_text = function(row, start_col, end_col)
     api.nvim_buf_set_text(s.bufnr, row - 1, start_col - 1, row - 1, end_col, {})
 end
 
+local add_extmark = function(row, col, pos)
+    local mark = api.nvim_buf_set_extmark(s.bufnr, namespace, row - 1, col, {})
+    if pos then
+        table.insert(s.extmarks, pos, mark)
+        return
+    end
+
+    table.insert(s.extmarks, mark)
+end
+
 local cword = function(cursor, line)
     local word = ""
     for i = cursor[2], 0, -1 do
@@ -119,25 +129,23 @@ local expand = function(snippet)
             or tonumber(string.match(a.match, "%d")) < tonumber(string.match(b.match, "%d"))
     end)
 
+    local trigger_start, trigger_end = string.find(s.line, s.cword)
+    if not has_final then
+        add_extmark(s.row, trigger_end, vim.tbl_count(positions) + 1)
+    end
+
     api.nvim_buf_set_text(s.bufnr, s.row - 1, s.col, s.row - 1, s.col, split)
 
     for _, pos in ipairs(positions) do
         local abs_row = s.row + pos.row - 1
         local line = api.nvim_buf_get_lines(s.bufnr, abs_row - 1, abs_row, true)[1]
-
         local pos_start, pos_end = string.find(line, pos.match)
-        table.insert(s.extmarks, api.nvim_buf_set_extmark(s.bufnr, namespace, abs_row - 1, pos_start, {}))
 
+        add_extmark(abs_row, pos_start)
         del_text(abs_row, pos_start, pos_end)
     end
 
-    local trigger_start, trigger_end = string.find(s.line, s.cword)
-    if not has_final then
-        table.insert(s.extmarks, api.nvim_buf_set_extmark(s.bufnr, namespace, s.row - 1, trigger_end, {}))
-    end
-
     del_text(s.row, trigger_start, trigger_end)
-
     jump()
 end
 
@@ -147,7 +155,8 @@ end
 
 M.expand_or_jump = function()
     if can_jump() then
-        return jump()
+        jump()
+        return
     end
 
     init()
