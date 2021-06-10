@@ -15,7 +15,7 @@ local initial_state = {
     jump_index = nil,
     bufnr = nil,
     ft = nil,
-    cword = nil,
+    trigger = nil,
     row = nil,
     col = nil,
     line = nil,
@@ -61,7 +61,7 @@ local add_extmark = function(row, col, pos)
     table.insert(s.extmarks, mark)
 end
 
-local cword = function(cursor, line)
+local resolve_trigger = function(cursor, line)
     local word = ""
     for i = cursor[2], 0, -1 do
         local char = string.sub(line, i, i)
@@ -83,7 +83,7 @@ local init = function()
 
     s.bufnr = api.nvim_get_current_buf()
     s.ft = vim.bo.ft
-    s.cword = cword(cursor, line)
+    s.trigger = resolve_trigger(cursor, line)
     s.line = line
     s.row = cursor[1]
     s.col = cursor[2]
@@ -129,7 +129,7 @@ local expand = function(snippet)
             or tonumber(string.match(a.match, "%d")) < tonumber(string.match(b.match, "%d"))
     end)
 
-    local trigger_start, trigger_end = string.find(s.line, s.cword)
+    local trigger_start, trigger_end = string.find(s.line, s.trigger)
     if not has_final then
         add_extmark(s.row, trigger_end, vim.tbl_count(positions) + 1)
     end
@@ -150,7 +150,7 @@ local expand = function(snippet)
 end
 
 local can_expand = function()
-    return snippets[s.ft] and snippets[s.ft][s.cword]
+    return snippets[s.ft] and snippets[s.ft][s.trigger]
 end
 
 M.expand_or_jump = function()
