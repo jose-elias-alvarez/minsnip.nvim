@@ -94,9 +94,6 @@ local can_jump = function(index)
     return s.extmarks[index or s.jump_index]
 end
 
--- exports
-local M = {}
-
 local reset = function()
     api.nvim_buf_clear_namespace(s.bufnr, namespace, 0, -1)
     augroup(nil)
@@ -104,26 +101,19 @@ local reset = function()
     s = vim.deepcopy(initial_state)
 end
 
-M.reset = reset
-
-M.check_pos = function()
-    local row = api.nvim_win_get_cursor(0)[1]
-    local diff = row - s.row
-    if diff < 0 or diff >= s.range then
-        reset()
-    end
-end
-
+-- main functions
 local jump = function(adjustment)
     s.jump_index = s.jump_index + (adjustment or 1)
     if not can_jump() then
-        return reset()
+        reset()
+        return
     end
 
     local mark_pos = api.nvim_buf_get_extmark_by_id(s.bufnr, namespace, s.extmarks[s.jump_index], {})
     local ok = pcall(api.nvim_win_set_cursor, 0, { mark_pos[1] + 1, mark_pos[2] })
     if not ok then
-        return reset()
+        reset()
+        return
     end
 
     if not can_jump(s.jump_index + 1) then
@@ -131,7 +121,21 @@ local jump = function(adjustment)
     end
 end
 
-M.jump = jump
+local can_expand = function()
+    reset()
+
+    local cursor = api.nvim_win_get_cursor(0)
+    local line = api.nvim_get_current_line()
+
+    s.bufnr = api.nvim_get_current_buf()
+    s.ft = vim.bo.ft
+    s.trigger = resolve_trigger(cursor, line)
+    s.line = line
+    s.row = cursor[1]
+    s.col = cursor[2]
+
+    return resolve_snippet()
+end
 
 local expand = function(snippet)
     local text = type(snippet) == "function" and snippet() or snippet
@@ -201,23 +205,18 @@ local expand = function(snippet)
     jump()
 end
 
-local can_expand = function()
-    reset()
+-- exports
+local M = {}
 
-    local cursor = api.nvim_win_get_cursor(0)
-    local line = api.nvim_get_current_line()
-
-    s.bufnr = api.nvim_get_current_buf()
-    s.ft = vim.bo.ft
-    s.trigger = resolve_trigger(cursor, line)
-    s.line = line
-    s.row = cursor[1]
-    s.col = cursor[2]
-
-    return resolve_snippet()
+M.check_pos = function()
+    local row = api.nvim_win_get_cursor(0)[1]
+    local diff = row - s.row
+    if diff < 0 or diff >= s.range then
+        reset()
+    end
 end
 
-M.expand_or_jump = function()
+M.jump = function()
     if can_jump() then
         return jump()
     end
@@ -225,11 +224,14 @@ M.expand_or_jump = function()
     local snippet = can_expand()
     if snippet then
         expand(snippet)
+        return true
     end
+
+    return false
 end
 
-M.can_expand_or_jump = function()
-    return can_jump() or can_expand()
+M.jump_backwards = function()
+    jump(-1)
 end
 
 M.setup = function(user_opts)
@@ -237,12 +239,12 @@ M.setup = function(user_opts)
 end
 
 -- testing / debugging
-M._reset = function()
+M.reset = function()
     reset()
     o = vim.deepcopy(defaults)
 end
 
-M._inspect = function()
+M.inspect = function()
     return { options = o, state = s, namespace = namespace }
 end
 

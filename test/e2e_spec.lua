@@ -4,21 +4,6 @@ local input = function(keys, mode)
     api.nvim_feedkeys(api.nvim_replace_termcodes(keys, true, false, true), mode or "x", true)
 end
 
-local expand = function(trigger)
-    input(string.format("i%s<Tab>", trigger))
-end
-
-local type = function(text)
-    input("i" .. text)
-end
-
-local jump = function()
-    input("i<Tab>")
-end
-local jump_backwards = function()
-    input("i<S-Tab>")
-end
-
 local assert_cursor_at = function(row, col)
     local cursor = api.nvim_win_get_cursor(0)
 
@@ -37,8 +22,24 @@ end
 
 describe("e2e", function()
     local minsnip = require("minsnip")
-    api.nvim_set_keymap("i", "<Tab>", "<cmd> lua require'minsnip'.expand_or_jump()<CR>", {})
-    api.nvim_set_keymap("i", "<S-Tab>", "<cmd> lua require'minsnip'.jump(-1)<CR>", {})
+    api.nvim_set_keymap("i", "<Tab>", "<cmd> lua require'minsnip'.jump()<CR>", {})
+    api.nvim_set_keymap("i", "<S-Tab>", "<cmd> lua require'minsnip'.jump_backwards()<CR>", {})
+
+    local expand = function(trigger)
+        input(string.format("i%s<Tab>", trigger))
+    end
+
+    local type = function(text)
+        input("i" .. text)
+    end
+
+    local jump = function()
+        input("i<Tab>")
+    end
+
+    local jump_backwards = function()
+        input("i<S-Tab>")
+    end
 
     local add_snippets = function(snippets)
         minsnip.setup({ snippets = { lua = snippets } })
@@ -50,7 +51,7 @@ describe("e2e", function()
 
     after_each(function()
         vim.cmd("bufdo! bdelete!")
-        minsnip._reset()
+        minsnip.reset()
     end)
 
     describe("should create namespace", function()
@@ -218,6 +219,40 @@ describe("e2e", function()
             assert_cursor_at(1, 9)
         end)
 
+        it("should skip over missing position", function()
+            add_snippets({ print = "print($1, $9)" })
+            expand("print")
+
+            jump()
+
+            assert_cursor_at(1, 8)
+        end)
+
+        it("should handle large number positions", function()
+            add_snippets({ print = "print($111111, $99999999)" })
+            expand("print")
+
+            jump()
+
+            assert_cursor_at(1, 8)
+        end)
+
+        it("should handle large number of positions", function()
+            local snippet = "print("
+            for i = 0, 100, 1 do
+                snippet = snippet .. string.format("$%d ", i)
+            end
+            add_snippets({ print = snippet })
+            expand("print")
+
+            for _ = 0, 100, 1 do
+                jump()
+            end
+
+            -- original length (6) + 1 space per iteration
+            assert_cursor_at(1, 106)
+        end)
+
         it("should jump across multiple lines", function()
             add_snippets({ func = [[
             function($1)
@@ -296,7 +331,7 @@ describe("e2e", function()
 
             expand("print")
 
-            local state = minsnip._inspect().state
+            local state = minsnip.inspect().state
             assert.equals(state.bufnr, api.nvim_get_current_buf())
             assert.equals(state.ft, "lua")
             assert.equals(state.trigger, "print")
@@ -312,7 +347,7 @@ describe("e2e", function()
             end]] })
             expand("func")
 
-            local state = minsnip._inspect().state
+            local state = minsnip.inspect().state
             assert.equals(state.range, 3)
         end)
 
@@ -321,10 +356,10 @@ describe("e2e", function()
 
             expand("print")
 
-            local state = minsnip._inspect().state
+            local state = minsnip.inspect().state
             assert.equals(vim.tbl_count(state.extmarks), 3)
 
-            local extmarks = api.nvim_buf_get_extmarks(0, minsnip._inspect().namespace, 0, -1, {})
+            local extmarks = api.nvim_buf_get_extmarks(0, minsnip.inspect().namespace, 0, -1, {})
             assert.equals(vim.tbl_count(extmarks), 3)
         end)
 
@@ -332,10 +367,10 @@ describe("e2e", function()
             add_snippets({ print = "print($1, $2)" })
 
             expand("print")
-            assert.equals(minsnip._inspect().state.jump_index, 1)
+            assert.equals(minsnip.inspect().state.jump_index, 1)
 
             jump()
-            assert.equals(minsnip._inspect().state.jump_index, 2)
+            assert.equals(minsnip.inspect().state.jump_index, 2)
         end)
 
         it("should set jumping = true when jumping", function()
@@ -343,7 +378,7 @@ describe("e2e", function()
 
             expand("print")
 
-            assert.equals(minsnip._inspect().state.jumping, true)
+            assert.equals(minsnip.inspect().state.jumping, true)
         end)
 
         it("should reset state after final jump", function()
@@ -352,7 +387,7 @@ describe("e2e", function()
             expand("print")
             jump()
 
-            local state = minsnip._inspect().state
+            local state = minsnip.inspect().state
             assert.equals(state.jumping, false)
             assert.equals(state.jump_index, 0)
             assert.equals(state.bufnr, nil)
@@ -369,7 +404,7 @@ describe("e2e", function()
             add_snippets({ print = "print($0)" })
             expand("print")
 
-            local extmarks = api.nvim_buf_get_extmarks(0, minsnip._inspect().namespace, 0, -1, {})
+            local extmarks = api.nvim_buf_get_extmarks(0, minsnip.inspect().namespace, 0, -1, {})
             assert.equals(vim.tbl_count(extmarks), 0)
         end)
 
@@ -380,7 +415,7 @@ describe("e2e", function()
             input("dd")
             jump()
 
-            assert.equals(minsnip._inspect().state.jumping, false)
+            assert.equals(minsnip.inspect().state.jumping, false)
         end)
     end)
 
@@ -411,7 +446,7 @@ describe("e2e", function()
 
             expand("clg")
 
-            assert.same(minsnip._inspect().options._parsed, { "typescriptreact" })
+            assert.same(minsnip.inspect().options._parsed, { "typescriptreact" })
         end)
 
         it("should do nothing if snippet not found", function()
@@ -485,7 +520,7 @@ describe("e2e", function()
             vim.cmd("1")
             minsnip.check_pos()
 
-            assert.equals(minsnip._inspect().state.jumping, true)
+            assert.equals(minsnip.inspect().state.jumping, true)
         end)
 
         it("should stop jumping when out of range", function()
@@ -498,7 +533,7 @@ describe("e2e", function()
             vim.cmd("normal 5o")
             minsnip.check_pos()
 
-            assert.equals(minsnip._inspect().state.jumping, false)
+            assert.equals(minsnip.inspect().state.jumping, false)
         end)
     end)
 end)
