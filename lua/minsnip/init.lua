@@ -142,7 +142,14 @@ end
 local expand = function(snippet)
     local _ = o.before and o.before()
 
-    local text = type(snippet) == "function" and snippet() or snippet
+    local text = snippet
+    if type(snippet) == "function" then
+        text = snippet()
+    end
+    if not text then
+        return false
+    end
+
     local split = type(text) == "string" and vim.split(text, "\n") or text
     local snip_indent = split[1]:match("^%s+")
     local line_indent = s.line:match("^%s+")
@@ -208,6 +215,8 @@ local expand = function(snippet)
 
     local _ = o.after and o.after()
     jump()
+
+    return true
 end
 
 -- exports
@@ -229,8 +238,7 @@ M.jump = function()
 
     local snippet = can_expand()
     if snippet then
-        expand(snippet)
-        return true
+        return expand(snippet)
     end
 
     return false
