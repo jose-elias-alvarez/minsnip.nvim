@@ -3,11 +3,13 @@ local api = vim.api
 local namespace = api.nvim_create_namespace("minsnip")
 
 -- options
-local o = {
+local defaults = {
     snippets = {},
     extends = {},
     _parsed = {},
 }
+
+local o = vim.deepcopy(defaults)
 
 -- state
 local initial_state = {
@@ -96,11 +98,7 @@ end
 local M = {}
 
 local reset = function()
-    if not s.jumping then
-        return
-    end
-
-    api.nvim_buf_clear_namespace(s.bufnr, namespace, s.row, s.row + s.range)
+    api.nvim_buf_clear_namespace(s.bufnr, namespace, 0, -1)
     augroup(nil)
 
     s = vim.deepcopy(initial_state)
@@ -109,12 +107,9 @@ end
 M.reset = reset
 
 M.check_pos = function()
-    if not s.jumping then
-        return
-    end
-
     local row = api.nvim_win_get_cursor(0)[1]
-    if math.abs(row - s.row) >= s.range then
+    local diff = row - s.row
+    if diff < 0 or diff >= s.range then
         reset()
     end
 end
@@ -128,7 +123,7 @@ local jump = function(adjustment)
     local mark_pos = api.nvim_buf_get_extmark_by_id(s.bufnr, namespace, s.extmarks[s.jump_index], {})
     local ok = pcall(api.nvim_win_set_cursor, 0, { mark_pos[1] + 1, mark_pos[2] })
     if not ok then
-        reset()
+        return reset()
     end
 
     if not can_jump(s.jump_index + 1) then
@@ -239,6 +234,16 @@ end
 
 M.setup = function(user_opts)
     o = vim.tbl_extend("force", o, user_opts)
+end
+
+-- testing / debugging
+M._reset = function()
+    reset()
+    o = vim.deepcopy(defaults)
+end
+
+M._inspect = function()
+    return { options = o, state = s, namespace = namespace }
 end
 
 return M
