@@ -4,14 +4,15 @@ local api = vim.api
 
 local input = function(keys, mode)
     api.nvim_feedkeys(api.nvim_replace_termcodes(keys, true, false, true), mode or "x", true)
+    -- wait for vim.schedule to set cursor position
+    vim.wait(0)
 end
 
 local assert_cursor_at = function(row, col)
     local cursor = api.nvim_win_get_cursor(0)
 
     assert.equals(cursor[1], row)
-    -- offset to account for feedkeys insert mode leave
-    assert.equals(cursor[2], col - 1)
+    assert.equals(cursor[2], col)
 end
 
 local get_lines = function()
@@ -22,7 +23,7 @@ local assert_content = function(content)
     assert.same(get_lines(), content)
 end
 
-describe("e2e", function()
+describe("suite", function()
     local minsnip = require("minsnip")
     api.nvim_set_keymap("i", "<Tab>", "<cmd> lua require'minsnip'.jump()<CR>", {})
     api.nvim_set_keymap("i", "<S-Tab>", "<cmd> lua require'minsnip'.jump_backwards()<CR>", {})
@@ -86,7 +87,7 @@ describe("e2e", function()
             expand("print")
 
             assert_content({ "print()" })
-            assert_cursor_at(1, 7)
+            assert_cursor_at(1, 6)
         end)
 
         it("should expand multiline snippet", function()
@@ -102,7 +103,7 @@ describe("e2e", function()
                 "    ",
                 "end",
             })
-            assert_cursor_at(2, 4)
+            assert_cursor_at(2, 3)
         end)
 
         it("should expand snippet within snippet", function()
@@ -155,7 +156,7 @@ describe("e2e", function()
                 "   end) ",
                 "end)",
             })
-            assert_cursor_at(3, 7)
+            assert_cursor_at(3, 6)
         end)
 
         it("should expand table snippet", function()
@@ -174,7 +175,7 @@ describe("e2e", function()
                 "    ",
                 "end)",
             })
-            assert_cursor_at(2, 4)
+            assert_cursor_at(2, 3)
         end)
 
         it("should expand function snippet", function()
@@ -221,19 +222,17 @@ describe("e2e", function()
             assert_cursor_at(1, 7)
         end)
 
-        it("should jump forwards, accounting for final position", function()
-            add_snippets({ print = "print($1, $2)" })
+        it("should skip over missing position", function()
+            add_snippets({ print = "print($1, $9)" })
             expand("print")
 
             jump()
-            assert_cursor_at(1, 8)
 
-            jump()
-            assert_cursor_at(1, 9)
+            assert_cursor_at(1, 8)
         end)
 
-        it("should skip over missing position", function()
-            add_snippets({ print = "print($1, $9)" })
+        it("should handle double position", function()
+            add_snippets({ print = "print($1, $1)" })
             expand("print")
 
             jump()
@@ -252,17 +251,18 @@ describe("e2e", function()
 
         it("should handle large number of positions", function()
             local snippet = "print("
-            for i = 0, 100, 1 do
+            for i = 1, 100, 1 do
                 snippet = snippet .. string.format("$%d ", i)
             end
+            snippet = snippet .. ")"
             add_snippets({ print = snippet })
             expand("print")
 
-            for _ = 0, 100, 1 do
+            for _ = 1, 100, 1 do
                 jump()
             end
 
-            -- original length (6) + 1 space per iteration
+            -- original length (6, zero-indexed) + 1 space per iteration
             assert_cursor_at(1, 106)
         end)
 
@@ -275,7 +275,7 @@ describe("e2e", function()
 
             jump()
 
-            assert_cursor_at(2, 4)
+            assert_cursor_at(2, 3)
         end)
 
         it("should jump backwards multiple lines", function()
@@ -299,10 +299,10 @@ describe("e2e", function()
             expand("func")
 
             jump()
-            assert_cursor_at(2, 4)
+            assert_cursor_at(2, 3)
 
             jump()
-            assert_cursor_at(3, 3)
+            assert_cursor_at(3, 2)
         end)
 
         it("should offset jump when inserting text", function()
@@ -334,7 +334,7 @@ describe("e2e", function()
 
             jump()
 
-            assert_cursor_at(2, 3)
+            assert_cursor_at(2, 2)
         end)
     end)
 

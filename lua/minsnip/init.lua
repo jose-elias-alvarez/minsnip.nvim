@@ -96,7 +96,10 @@ local can_jump = function(index)
     return s.jumping and s.extmarks[index or s.jump_index]
 end
 
-local reset = function()
+local reset = function(force)
+    if not s.jumping and not force then
+        return
+    end
     api.nvim_buf_clear_namespace(s.bufnr, namespace, 0, -1)
     augroup(nil)
 
@@ -112,11 +115,13 @@ local jump = function(adjustment)
     end
 
     local mark_pos = api.nvim_buf_get_extmark_by_id(s.bufnr, namespace, s.extmarks[s.jump_index], {})
-    local ok = pcall(api.nvim_win_set_cursor, 0, { mark_pos[1] + 1, mark_pos[2] })
-    if not ok then
-        reset()
-        return
-    end
+    -- make sure content and extmarks are ready before moving cursor
+    vim.schedule(function()
+        local ok = pcall(api.nvim_win_set_cursor, 0, { mark_pos[1] + 1, mark_pos[2] })
+        if not ok then
+            reset()
+        end
+    end)
 
     if not can_jump(s.jump_index + 1) then
         reset()
@@ -254,7 +259,7 @@ end
 
 -- testing / debugging
 M.reset = function()
-    reset()
+    reset(true)
     o = vim.deepcopy(defaults)
 end
 
