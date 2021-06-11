@@ -2,11 +2,19 @@ local api = vim.api
 
 local namespace = api.nvim_create_namespace("minsnip")
 
+-- options
+local o = {
+    snippets = {},
+    extends = {},
+    _parsed = {},
+}
+
 -- state
 local initial_state = {
     jumping = false,
     jump_index = 0,
     bufnr = nil,
+    ft = nil,
     trigger = nil,
     row = nil,
     col = nil,
@@ -16,9 +24,28 @@ local initial_state = {
 }
 local s = vim.deepcopy(initial_state)
 
-local snippets = {}
-
 -- local functions
+local parse_extended = function()
+    for _, extended in ipairs(o.extends[s.ft]) do
+        o.snippets[s.ft] = vim.tbl_extend("force", o.snippets[s.ft] or {}, o.snippets[extended])
+    end
+    table.insert(o._parsed, s.ft)
+end
+
+local get_snippet = function()
+    return o.snippets[s.ft] and o.snippets[s.ft][s.trigger]
+end
+
+local resolve_snippet = function()
+    local snippet = get_snippet()
+    if not snippet and not vim.tbl_contains(o._parsed, s.ft) then
+        parse_extended()
+        snippet = get_snippet()
+    end
+
+    return snippet
+end
+
 local augroup = function(autocmd)
     api.nvim_exec(
         string.format(
@@ -171,12 +198,13 @@ local can_expand = function()
     local line = api.nvim_get_current_line()
 
     s.bufnr = api.nvim_get_current_buf()
+    s.ft = vim.bo.ft
     s.trigger = resolve_trigger(cursor, line)
     s.line = line
     s.row = cursor[1]
     s.col = cursor[2]
 
-    return snippets[vim.bo.ft] and snippets[vim.bo.ft][s.trigger]
+    return resolve_snippet()
 end
 
 M.expand_or_jump = function()
@@ -195,7 +223,7 @@ M.can_expand_or_jump = function()
 end
 
 M.setup = function(user_opts)
-    snippets = user_opts.snippets
+    o = vim.tbl_extend("force", o, user_opts)
 end
 
 return M
