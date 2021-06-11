@@ -68,8 +68,8 @@ local del_text = function(row, start_col, end_col)
     api.nvim_buf_set_text(s.bufnr, row - 1, start_col - 1, row - 1, end_col, {})
 end
 
-local add_extmark = function(row, col)
-    table.insert(s.extmarks, api.nvim_buf_set_extmark(s.bufnr, namespace, row - 1, col, {}))
+local make_extmark = function(row, col)
+    return api.nvim_buf_set_extmark(s.bufnr, namespace, row - 1, col, {})
 end
 
 local resolve_trigger = function(cursor, line)
@@ -144,10 +144,13 @@ local expand = function(snippet)
     local snip_indent = split[1]:match("^%s+")
     local line_indent = s.line:match("^%s+")
 
-    local positions, adjusted = {}, {}
+    local positions, adjusted, has_final = {}, {}, false
     for split_row, split_text in ipairs(split) do
         s.range = s.range + 1
         for match in split_text:gmatch("%$%d+") do
+            if not has_final and match == "$0" then
+                has_final = true
+            end
             table.insert(positions, { match = match, row = split_row })
         end
 
@@ -178,6 +181,9 @@ local expand = function(snippet)
         return tonumber(a.match:match("%d")) < tonumber(b.match:match("%d"))
     end)
 
+    local trigger_start, trigger_end = s.line:find(s.trigger, s.col - #s.trigger)
+    local final = not has_final and make_extmark(s.row, trigger_end)
+
     api.nvim_buf_set_text(s.bufnr, s.row - 1, s.col, s.row - 1, s.col, adjusted)
 
     for _, pos in ipairs(positions) do
@@ -185,11 +191,13 @@ local expand = function(snippet)
         local line = api.nvim_buf_get_lines(s.bufnr, abs_row - 1, abs_row, true)[1]
         local pos_start, pos_end = line:find(pos.match)
 
-        add_extmark(abs_row, pos_start)
+        table.insert(s.extmarks, make_extmark(abs_row, pos_start))
         del_text(abs_row, pos_start, pos_end)
     end
+    if final then
+        table.insert(s.extmarks, final)
+    end
 
-    local trigger_start, trigger_end = s.line:find(s.trigger, s.col - #s.trigger)
     del_text(s.row, trigger_start, trigger_end)
 
     augroup("autocmd CursorMoved,CursorMovedI * lua require'minsnip'.check_pos()")
