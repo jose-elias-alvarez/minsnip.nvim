@@ -26,6 +26,10 @@ local s = vim.deepcopy(initial_state)
 
 -- local functions
 local parse_extended = function()
+    if not o.extends[s.ft] then
+        return
+    end
+
     for _, extended in ipairs(o.extends[s.ft]) do
         o.snippets[s.ft] = vim.tbl_extend("force", o.snippets[s.ft] or {}, o.snippets[extended])
     end
@@ -84,8 +88,8 @@ local resolve_trigger = function(cursor, line)
     return word:reverse()
 end
 
-local can_jump = function()
-    return s.extmarks[s.jump_index]
+local can_jump = function(index)
+    return s.extmarks[index or s.jump_index]
 end
 
 -- exports
@@ -118,13 +122,16 @@ end
 local jump = function(adjustment)
     s.jump_index = s.jump_index + (adjustment or 1)
     if not can_jump() then
-        -- recursively check if user entered another snippet, otherwise reset
-        return M.expand_or_jump()
+        return reset()
     end
 
     local mark_pos = api.nvim_buf_get_extmark_by_id(s.bufnr, namespace, s.extmarks[s.jump_index], {})
     local ok = pcall(api.nvim_win_set_cursor, 0, { mark_pos[1] + 1, mark_pos[2] })
     if not ok then
+        reset()
+    end
+
+    if not can_jump(s.jump_index + 1) then
         reset()
     end
 end
