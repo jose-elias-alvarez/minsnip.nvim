@@ -1,3 +1,5 @@
+local stub = require("luassert.stub")
+
 local api = vim.api
 
 local input = function(keys, mode)
@@ -185,6 +187,17 @@ describe("e2e", function()
             expand("hello")
 
             assert_content({ "Hello!" })
+        end)
+
+        it("should run callbacks if defined", function()
+            local before = stub.new()
+            local after = stub.new()
+            minsnip.setup({ snippets = { lua = { print = "print($0)" } }, before = before, after = after })
+
+            expand("print")
+
+            assert.stub(before).was_called()
+            assert.stub(after).was_called()
         end)
     end)
 

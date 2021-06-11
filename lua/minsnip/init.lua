@@ -6,6 +6,8 @@ local namespace = api.nvim_create_namespace("minsnip")
 local defaults = {
     snippets = {},
     extends = {},
+    before = nil,
+    after = nil,
     _parsed = {},
 }
 
@@ -91,7 +93,7 @@ local resolve_trigger = function(cursor, line)
 end
 
 local can_jump = function(index)
-    return s.extmarks[index or s.jump_index]
+    return s.jumping and s.extmarks[index or s.jump_index]
 end
 
 local reset = function()
@@ -138,6 +140,8 @@ local can_expand = function()
 end
 
 local expand = function(snippet)
+    local _ = o.before and o.before()
+
     local text = type(snippet) == "function" and snippet() or snippet
     local split = type(text) == "string" and vim.split(text, "\n") or text
     local snip_indent = split[1]:match("^%s+")
@@ -202,6 +206,7 @@ local expand = function(snippet)
     augroup("autocmd CursorMoved,CursorMovedI * lua require'minsnip'.check_pos()")
     s.jumping = true
 
+    local _ = o.after and o.after()
     jump()
 end
 
@@ -218,7 +223,8 @@ end
 
 M.jump = function()
     if can_jump() then
-        return jump()
+        jump()
+        return true
     end
 
     local snippet = can_expand()
