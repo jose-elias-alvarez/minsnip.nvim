@@ -2,10 +2,11 @@ local api = vim.api
 
 local namespace = api.nvim_create_namespace("minsnip")
 
+-- state
 local initial_state = {
-    jump_index = nil,
+    jumping = false,
+    jump_index = 0,
     bufnr = nil,
-    ft = nil,
     trigger = nil,
     row = nil,
     col = nil,
@@ -13,40 +14,36 @@ local initial_state = {
     range = 0,
     extmarks = {},
 }
+local s = vim.deepcopy(initial_state)
 
 local snippets = {}
 
-local s = vim.deepcopy(initial_state)
-
-local M = {}
-
-local reset = function()
-    if not s.jump_index then
-        return
-    end
-
-    api.nvim_buf_clear_namespace(s.bufnr, namespace, s.row, s.row + s.range)
-    api.nvim_exec([[
+-- local functions
+local augroup = function(autocmd)
+    api.nvim_exec(
+        string.format(
+            [[
         augroup Minsnip
             autocmd!
-        augroup END
-        ]], false)
-
-    s = vim.deepcopy(initial_state)
+            %s
+        augroup END]],
+            autocmd or ""
+        ),
+        false
+    )
 end
-
-M.reset = reset
 
 local del_text = function(row, start_col, end_col)
     api.nvim_buf_set_text(s.bufnr, row - 1, start_col - 1, row - 1, end_col, {})
 end
 
-local make_extmark = function(row, col)
-    return api.nvim_buf_set_extmark(s.bufnr, namespace, row - 1, col, {})
+local add_extmark = function(row, col)
+    table.insert(s.extmarks, api.nvim_buf_set_extmark(s.bufnr, namespace, row - 1, col, {}))
 end
 
 local resolve_trigger = function(cursor, line)
     local word = ""
+    -- iterate backwards from cursor position until non-alphanumeric char is found
     for i = cursor[2], 0, -1 do
         local char = line:sub(i, i)
         if char:match("%W") then
@@ -56,25 +53,32 @@ local resolve_trigger = function(cursor, line)
         word = word .. char
     end
 
+    -- reverse to account for backwards iteration
     return word:reverse()
 end
 
-local init = function()
-    reset()
-
-    local cursor = api.nvim_win_get_cursor(0)
-    local line = api.nvim_get_current_line()
-
-    s.bufnr = api.nvim_get_current_buf()
-    s.ft = vim.bo.ft
-    s.trigger = resolve_trigger(cursor, line)
-    s.line = line
-    s.row = cursor[1]
-    s.col = cursor[2]
+local can_jump = function()
+    return s.extmarks[s.jump_index]
 end
 
+-- exports
+local M = {}
+
+local reset = function()
+    if not s.jumping then
+        return
+    end
+
+    api.nvim_buf_clear_namespace(s.bufnr, namespace, s.row, s.row + s.range)
+    augroup(nil)
+
+    s = vim.deepcopy(initial_state)
+end
+
+M.reset = reset
+
 M.check_pos = function()
-    if not s.jump_index then
+    if not s.jumping then
         return
     end
 
@@ -84,36 +88,23 @@ M.check_pos = function()
     end
 end
 
-local can_jump = function()
-    return s.extmarks[s.jump_index]
-end
-
 local jump = function(adjustment)
-    s.jump_index = (s.jump_index or 0) + (adjustment or 1)
+    s.jump_index = s.jump_index + (adjustment or 1)
     if not can_jump() then
+        -- recursively check if user entered another snippet, otherwise reset
         return M.expand_or_jump()
     end
 
     local mark_pos = api.nvim_buf_get_extmark_by_id(s.bufnr, namespace, s.extmarks[s.jump_index], {})
     local ok = pcall(api.nvim_win_set_cursor, 0, { mark_pos[1] + 1, mark_pos[2] })
     if not ok then
-        return reset()
+        reset()
     end
 end
 
 M.jump = jump
 
 local expand = function(snippet)
-    api.nvim_exec(
-        [[
-    augroup Minsnip
-        autocmd!
-        autocmd CursorMoved,CursorMovedI * lua require'minsnip'.check_pos()
-    augroup END
-    ]],
-        false
-    )
-
     local text = type(snippet) == "function" and snippet() or snippet
     local split = type(text) == "string" and vim.split(text, "\n") or text
     local snip_indent = split[1]:match("^%s+")
@@ -126,19 +117,23 @@ local expand = function(snippet)
             table.insert(positions, { match = match, row = split_row })
         end
 
+        -- adjust to account for [[]] snippet indentation
         if snip_indent then
             local _, indent_end = split_text:find(snip_indent)
             if indent_end then
                 split_text = split_text:sub(indent_end + 1)
             end
         end
+        -- adjust to account for existing indentation
         if line_indent and split_row > 1 then
             split_text = line_indent .. split_text
         end
+
         table.insert(adjusted, split_text)
     end
 
     table.sort(positions, function(a, b)
+        -- make sure $0 is always last
         if a.match == "$0" then
             return false
         end
@@ -156,19 +151,32 @@ local expand = function(snippet)
         local line = api.nvim_buf_get_lines(s.bufnr, abs_row - 1, abs_row, true)[1]
         local pos_start, pos_end = line:find(pos.match)
 
-        table.insert(s.extmarks, make_extmark(abs_row, pos_start))
+        add_extmark(abs_row, pos_start)
         del_text(abs_row, pos_start, pos_end)
     end
 
     local trigger_start, trigger_end = s.line:find(s.trigger, s.col - #s.trigger)
     del_text(s.row, trigger_start, trigger_end)
 
+    augroup("autocmd CursorMoved,CursorMovedI * lua require'minsnip'.check_pos()")
+    s.jumping = true
+
     jump()
 end
 
 local can_expand = function()
-    init()
-    return snippets[s.ft] and snippets[s.ft][s.trigger]
+    reset()
+
+    local cursor = api.nvim_win_get_cursor(0)
+    local line = api.nvim_get_current_line()
+
+    s.bufnr = api.nvim_get_current_buf()
+    s.trigger = resolve_trigger(cursor, line)
+    s.line = line
+    s.row = cursor[1]
+    s.col = cursor[2]
+
+    return snippets[vim.bo.ft] and snippets[vim.bo.ft][s.trigger]
 end
 
 M.expand_or_jump = function()
