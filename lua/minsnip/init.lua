@@ -6,8 +6,6 @@ local namespace = api.nvim_create_namespace("minsnip")
 local defaults = {
     snippets = {},
     extends = {},
-    before = nil,
-    after = nil,
     _parsed = {},
 }
 
@@ -145,8 +143,6 @@ local can_expand = function()
 end
 
 local expand = function(snippet)
-    local _ = o.before and o.before()
-
     local text = snippet
     if type(snippet) == "function" then
         text = snippet()
@@ -217,8 +213,6 @@ local expand = function(snippet)
 
     augroup("autocmd CursorMoved,CursorMovedI * lua require'minsnip'.check_pos()")
     s.jumping = true
-
-    local _ = o.after and o.after()
     jump()
 
     return true

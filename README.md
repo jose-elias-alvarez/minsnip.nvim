@@ -77,26 +77,26 @@ local snippets = {
 ## Positions
 
 Snippets can have any number of positions, each consisting of a `$` followed by
-a number. Like other plugin implementations, `$0` is a special case denoting the
-final jump, and Minsnip will insert a final position at the end of the snippet
-if you don't specifically define one.
+a number. Like other implementations, `$0` is a special case denoting the final
+jump, and Minsnip will insert a final position at the end of the snippet if you
+don't specifically define one.
 
 ```lua
--- this is ok,
+-- this is OK,
 print($1, $2)
 
--- but it's better to explictly define a final position
+-- but it's better to explicitly define a final position
 print($1, $0)
 
 -- "missing" positions will get skipped
-print($1, $9999)
+print($1, $9)
 ```
 
 Unlike other implementations, Minsnip does not "link" identical positions.
 Minsnip treats each position in this snippet as an independent position:
 
 ```lua
--- expanding moves the cursor to the first position,
+-- expanding moves the cursor to the first $1,
 -- and the next jump goes to the second
 print($1, $1)
 ```
@@ -176,12 +176,6 @@ require("minsnip").setup({
 })
 ```
 
-## Callbacks
-
-You can optionally pass a `before` and / or `after` callback to `setup`. If
-defined, Minsnip will call `before` once before expanding and `after` once after
-expanding.
-
 ## Contributions
 
 Minsnip is in **alpha status**, and you may run into bugs in normal usage.
@@ -207,7 +201,7 @@ Run `make test` in the root directory.
   the same format as VS Code, meaning you can use snippets from VS Code
   extensions. Also supports LSP snippets and integrates with popular completion
   engines. I used vim-vsnip for a long time and am a fan of everything except
-  writing my own JSON snippets, which is hellish.
+  writing my own JSON snippets, which is awful.
 
 - [snippets.nvim](https://github.com/norcalli/snippets.nvim): a powerful
   plugin written in Lua that I, personally, was never able to wrap my head
