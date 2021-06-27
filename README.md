@@ -28,7 +28,7 @@ Minsnip is **not** for you if:
 
 - You want features like linked snippets, recursive expansion, automatic
   expansion, LSP snippets, or integration with completion plugins (they're not
-  available)
+  implemented)
 - You want to use a pre-existing library of snippets (there isn't one)
 - You don't want to use Lua (you have to)
 - You use Vim (it's Neovim-only)
@@ -143,17 +143,36 @@ local snippets = {
     lua = {
         flo = function()
             if vim.api.nvim_win_get_cursor(0)[1] == 1 then
-                return "first line only"
+                return "I am at the top of this file!"
             end
         end,
     }
 }
 ```
 
+And if this is a condition you plan on reusing, Lua makes it easy to write a wrapper:
+
+```lua
+local first_line_only = function(snippet)
+    return function()
+        return vim.api.nvim_win_get_cursor(0)[1] == 1 and snippet
+    end
+end
+
+local snippets = {
+    lua = {
+        top = first_line_only("I am the first line of this file!"),
+    },
+}
+```
+
+Instead of filling the plugin with features you _might_ use, Minsnip's goal is
+to make it simple to write the snippets you _want_ to use.
+
 ## Extending filetypes
 
 You can extend one filetype's snippets with another's by passing a list of
-filetypes to `setup` under the key `extends`, as below:
+filetypes to `setup` under the key `extends`, as in the example below:
 
 ```lua
 local snippets = {
@@ -182,8 +201,8 @@ Minsnip is in **alpha status**, and you may run into bugs in normal usage.
 Bug reports and fixes are greatly appreciated.
 
 Feature requests and contributions are also welcome, but please note that I will
-continue to err towards the side of minimalism. If features are what you're
-after, please use another plugin!
+continue to err towards the side of minimalism. If built-in features are what
+you're after, I recommend using one of the alternatives listed below.
 
 ## Testing
 
@@ -195,7 +214,8 @@ Run `make test` in the root directory.
   custom `snippets` format that's ergonomic and easy to use. It integrates with
   [vim-snippets](https://github.com/honza/vim-snippets), a repository with a
   large selection of snippets for most languages. Drawbacks are performance and
-  a gigantic code base.
+  a gigantic code base that makes it hard (at least for me) to understand what's
+  going on.
 
 - [vim-vsnip](https://github.com/hrsh7th/vim-vsnip): supports JSON snippets in
   the same format as VS Code, meaning you can use snippets from VS Code
@@ -205,4 +225,4 @@ Run `make test` in the root directory.
 
 - [snippets.nvim](https://github.com/norcalli/snippets.nvim): a powerful
   plugin written in Lua that I, personally, was never able to wrap my head
-  around. Hasn't seen an update for some time.
+  around. Hasn't seen an update for some time as of this writing.
