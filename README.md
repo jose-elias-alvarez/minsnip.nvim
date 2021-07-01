@@ -2,7 +2,7 @@
 
 An aggressively minimalistic snippet plugin.
 
-(animation goes here)
+https://user-images.githubusercontent.com/54108223/124072438-b9532a80-da7b-11eb-89a1-8355291abb73.mov
 
 ## Feature(s)
 
@@ -17,7 +17,7 @@ Minsnip does its best to stay out of your way and avoid affecting editor
 performance. When you're not jumping in a snippet, Minsnip does nothing. Once
 you're done, it wipes itself out until you call it again.
 
-Minsnip may be for you if:
+Minsnip _may_ be for you if:
 
 - You value simplicity and speed over features
 - You are comfortable with Lua and the Neovim API
@@ -26,12 +26,12 @@ Minsnip may be for you if:
 
 Minsnip is **not** for you if:
 
-- You want features like linked snippets, recursive expansion, automatic
-  expansion, LSP snippets, or integration with completion plugins (they're not
-  implemented)
-- You want to use a pre-existing library of snippets (there isn't one)
-- You don't want to use Lua (you have to)
-- You use Vim (it's Neovim-only)
+- You want built-in features like linked snippets, recursive expansion,
+  automatic expansion, LSP snippets, or integration with completion plugins
+  (they're not implemented!)
+- You want to use a pre-existing library of snippets (there isn't one!)
+- You don't want to use Lua (you have to!)
+- You use Vim (it's Neovim-only!)
 
 ## Defining snippets
 
@@ -50,7 +50,7 @@ local snippets = {
         -- lists work, but bracket strings are better, right?
         lfunc = { "local $1 = ($2)", "\t$0", "end" },
 
-        -- functions also work,
+        -- functions also work (more on that below)
         clip = function()
             return vim.fn.getreg("*")
         end
@@ -88,7 +88,7 @@ print($1, $2)
 -- but it's better to explicitly define a final position
 print($1, $0)
 
--- "missing" positions will get skipped
+-- missing positions get skipped
 print($1, $9)
 ```
 
@@ -202,7 +202,7 @@ Bug reports and fixes are greatly appreciated.
 
 Feature requests and contributions are also welcome, but please note that I will
 continue to err towards the side of minimalism. If built-in features are what
-you're after, I recommend using one of the alternatives listed below.
+you're after, I recommend trying one of the alternatives listed below.
 
 ## Testing
 

@@ -1,18 +1,14 @@
-local stub = require("luassert.stub")
-
 local api = vim.api
 
-local input = function(keys, mode)
-    api.nvim_feedkeys(api.nvim_replace_termcodes(keys, true, false, true), mode or "x", true)
-    -- wait for vim.schedule to set cursor position
-    vim.wait(0)
+local input = function(keys)
+    api.nvim_feedkeys(api.nvim_replace_termcodes(keys, true, false, true), "x", true)
 end
 
 local assert_cursor_at = function(row, col)
     local cursor = api.nvim_win_get_cursor(0)
 
     assert.equals(cursor[1], row)
-    assert.equals(cursor[2], col)
+    assert.equals(cursor[2], col - 1)
 end
 
 local get_lines = function()
@@ -32,16 +28,16 @@ describe("suite", function()
         input(string.format("i%s<Tab>", trigger))
     end
 
-    local type = function(text)
-        input("i" .. text)
-    end
-
-    local jump = function()
-        input("i<Tab>")
-    end
-
-    local jump_backwards = function()
-        input("i<S-Tab>")
+    local expand_and_jump = function(trigger, jumps)
+        local cmd = string.format("i%s<Tab>", trigger)
+        for _, j in ipairs(jumps) do
+            if type(j) == "number" then
+                cmd = cmd .. (j == 1 and "<Tab>" or "<S-Tab>")
+            else
+                cmd = cmd .. j
+            end
+        end
+        input(cmd)
     end
 
     local add_snippets = function(snippets)
@@ -54,10 +50,10 @@ describe("suite", function()
 
     after_each(function()
         vim.cmd("bufdo! bdelete!")
-        minsnip.reset()
+        minsnip._reset()
     end)
 
-    describe("should create namespace", function()
+    it("should create namespace", function()
         minsnip.setup({})
 
         assert.truthy(api.nvim_get_namespaces()["minsnip"])
@@ -87,7 +83,7 @@ describe("suite", function()
             expand("print")
 
             assert_content({ "print()" })
-            assert_cursor_at(1, 6)
+            assert_cursor_at(1, 7)
         end)
 
         it("should expand multiline snippet", function()
@@ -103,7 +99,7 @@ describe("suite", function()
                 "    ",
                 "end",
             })
-            assert_cursor_at(2, 3)
+            assert_cursor_at(2, 4)
         end)
 
         it("should expand snippet within snippet", function()
@@ -156,7 +152,7 @@ describe("suite", function()
                 "   end) ",
                 "end)",
             })
-            assert_cursor_at(3, 6)
+            assert_cursor_at(3, 7)
         end)
 
         it("should expand table snippet", function()
@@ -175,95 +171,63 @@ describe("suite", function()
                 "    ",
                 "end)",
             })
-            assert_cursor_at(2, 3)
-        end)
-
-        it("should expand function snippet", function()
-            add_snippets({
-                hello = function()
-                    return "Hello!"
-                end,
-            })
-
-            expand("hello")
-
-            assert_content({ "Hello!" })
-        end)
-
-        it("should run callbacks if defined", function()
-            local before = stub.new()
-            local after = stub.new()
-            minsnip.setup({ snippets = { lua = { print = "print($0)" } }, before = before, after = after })
-
-            expand("print")
-
-            assert.stub(before).was_called()
-            assert.stub(after).was_called()
+            assert_cursor_at(2, 4)
         end)
     end)
 
     describe("jump", function()
         it("should jump forwards", function()
             add_snippets({ print = "print($1, $0)" })
-            expand("print")
 
-            jump()
+            expand_and_jump("print", { 1 })
 
             assert_cursor_at(1, 8)
         end)
 
         it("should jump backwards", function()
-            add_snippets({ print = "print($1, $0)" })
-            expand("print")
+            add_snippets({ print = "print($1, $2)" })
 
-            jump()
-            jump_backwards()
+            expand_and_jump("print", { 1, -1 })
 
-            assert_cursor_at(1, 7)
+            assert_cursor_at(1, 6)
         end)
 
         it("should skip over missing position", function()
             add_snippets({ print = "print($1, $9)" })
-            expand("print")
 
-            jump()
+            expand_and_jump("print", { 1 })
 
             assert_cursor_at(1, 8)
         end)
 
         it("should handle double position", function()
             add_snippets({ print = "print($1, $1)" })
-            expand("print")
 
-            jump()
+            expand_and_jump("print", { 1 })
 
             assert_cursor_at(1, 8)
         end)
 
         it("should handle large number positions", function()
             add_snippets({ print = "print($111111, $99999999)" })
-            expand("print")
 
-            jump()
+            expand_and_jump("print", { 1 })
 
             assert_cursor_at(1, 8)
         end)
 
         it("should handle large number of positions", function()
-            local snippet = "print("
+            local snippet, jumps = "print(", {}
             for i = 1, 100, 1 do
                 snippet = snippet .. string.format("$%d ", i)
+                table.insert(jumps, 1)
             end
             snippet = snippet .. ")"
             add_snippets({ print = snippet })
-            expand("print")
 
-            for _ = 1, 100, 1 do
-                jump()
-            end
+            expand_and_jump("print", jumps)
 
-            -- original length (6, zero-indexed) + 1 space per iteration
-            assert_cursor_at(1, 106)
+            assert_cursor_at(1, 107)
         end)
 
         it("should jump across multiple lines", function()
@@ -271,134 +235,29 @@ describe("suite", function()
             function($1)
                 $0
             end]] })
-            expand("func")
 
-            jump()
+            expand_and_jump("func", { 1 })
 
-            assert_cursor_at(2, 3)
+            assert_cursor_at(2, 4)
         end)
 
-        it("should jump backwards multiple lines", function()
+        it("should jump backwards across multiple lines", function()
             add_snippets({ func = [[
             function($1)
                 $2
             end]] })
-            expand("func")
 
-            jump()
-            jump_backwards()
+            expand_and_jump("func", { 1, -1 })
 
             assert_cursor_at(1, 9)
-        end)
-
-        it("should jump across multiple lines, accounting for final position", function()
-            add_snippets({ func = [[
-            function($1)
-                $2
-            end]] })
-            expand("func")
-
-            jump()
-            assert_cursor_at(2, 3)
-
-            jump()
-            assert_cursor_at(3, 2)
-        end)
-
-        it("should offset jump when inserting text", function()
-            add_snippets({ print = "print($1, $0)" })
-            expand("print")
-            type("hello")
-
-            jump()
-
-            assert_cursor_at(1, 13)
-        end)
-
-        it("should offset multiple jumps when inserting text", function()
-            add_snippets({ print = "print($1, $2, $3)" })
-            expand("print")
-            type("hello")
-
-            jump()
-            type("hello")
-
-            jump()
-            assert_cursor_at(1, 20)
-        end)
-
-        it("should offset jump when inserting newline", function()
-            add_snippets({ print = "print($1, $0)" })
-            expand("print")
-            type("<CR>")
-
-            jump()
-
-            assert_cursor_at(2, 2)
         end)
     end)
 
     describe("state", function()
-        it("should set buffer info", function()
-            add_snippets({ print = "print($1)" })
+        it("should reset state after expanding", function()
+            add_snippets({ print = "print($0)" })
 
             expand("print")
-
-            local state = minsnip.inspect().state
-            assert.equals(state.bufnr, api.nvim_get_current_buf())
-            assert.equals(state.ft, "lua")
-            assert.equals(state.trigger, "print")
-            assert.equals(state.row, 1)
-            assert.equals(state.col, 5)
-            assert.equals(state.line, "print")
-        end)
-
-        it("should set range based on snippet newlines", function()
-            add_snippets({ func = [[
-            function($1)
-                $2
-            end]] })
-            expand("func")
-
-            local state = minsnip.inspect().state
-            assert.equals(state.range, 3)
-        end)
-
-        it("should set one extmark per jump", function()
-            add_snippets({ print = "print($1, $2, $0)" })
-
-            expand("print")
-
-            local state = minsnip.inspect().state
-            assert.equals(vim.tbl_count(state.extmarks), 3)
-
-            local extmarks = api.nvim_buf_get_extmarks(0, minsnip.inspect().namespace, 0, -1, {})
-            assert.equals(vim.tbl_count(extmarks), 3)
-        end)
-
-        it("should update jump index on jump", function()
-            add_snippets({ print = "print($1, $2)" })
-
-            expand("print")
-            assert.equals(minsnip.inspect().state.jump_index, 1)
-
-            jump()
-            assert.equals(minsnip.inspect().state.jump_index, 2)
-        end)
-
-        it("should set jumping = true when jumping", function()
-            add_snippets({ print = "print($1)" })
-
-            expand("print")
-
-            assert.equals(minsnip.inspect().state.jumping, true)
-        end)
-
-        it("should reset state after final jump", function()
-            add_snippets({ print = "print($1)" })
-
-            expand("print")
-            jump()
 
             local state = minsnip.inspect().state
             assert.equals(state.jumping, false)
@@ -413,22 +272,12 @@ describe("suite", function()
             assert.equals(vim.tbl_count(state.extmarks), 0)
         end)
 
-        it("should remove extmarks", function()
+        it("should remove extmarks after expanding", function()
             add_snippets({ print = "print($0)" })
             expand("print")
 
             local extmarks = api.nvim_buf_get_extmarks(0, minsnip.inspect().namespace, 0, -1, {})
             assert.equals(vim.tbl_count(extmarks), 0)
-        end)
-
-        it("should stop jumping after attempting invalid jump", function()
-            add_snippets({ print = "print($1)" })
-            expand("print")
-
-            input("dd")
-            jump()
-
-            assert.equals(minsnip.inspect().state.jumping, false)
         end)
     end)
 
@@ -488,65 +337,6 @@ describe("suite", function()
             expand("clg")
 
             assert_content({ "clg" })
-        end)
-    end)
-
-    describe("autocmd", function()
-        it("should create autocmd when jumping", function()
-            add_snippets({ print = "print($1)" })
-
-            expand("print")
-
-            assert.equals(vim.fn.exists("#Minsnip#CursorMoved,CursorMovedI"), 1)
-        end)
-
-        it("should remove autocmd after jumping", function()
-            add_snippets({ print = "print($1)" })
-
-            expand("print")
-            jump()
-
-            assert.equals(vim.fn.exists("#Minsnip#CursorMoved,CursorMovedI"), 0)
-        end)
-
-        it("should re-ad autocmd on subsequent jump", function()
-            add_snippets({ print = "print($1)" })
-
-            expand("print")
-            jump()
-            expand("print")
-
-            assert.equals(vim.fn.exists("#Minsnip#CursorMoved,CursorMovedI"), 1)
-        end)
-    end)
-
-    describe("check_pos", function()
-        -- annoyingly, the autocmd doesn't seem to trigger in a headless instance,
-        -- so we trigger it manually
-        it("should keep jumping when moving within range", function()
-            add_snippets({ func = [[
-            function($1)
-                $0
-            end]] })
-            expand("func")
-
-            vim.cmd("1")
-            minsnip.check_pos()
-
-            assert.equals(minsnip.inspect().state.jumping, true)
-        end)
-
-        it("should stop jumping when out of range", function()
-            add_snippets({ func = [[
-            function($1)
-                $0
-            end]] })
-            expand("func")
-
-            vim.cmd("normal 5o")
-            minsnip.check_pos()
-
-            assert.equals(minsnip.inspect().state.jumping, false)
         end)
     end)
 end)

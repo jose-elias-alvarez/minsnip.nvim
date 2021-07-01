@@ -104,8 +104,8 @@ local reset = function(force)
     s = vim.deepcopy(initial_state)
 end
 
--- main functions
-local jump = function(adjustment)
+-- main
+local function jump(adjustment)
     s.jump_index = s.jump_index + (adjustment or 1)
     if not can_jump() then
         reset()
@@ -113,13 +113,17 @@ local jump = function(adjustment)
     end
 
     local mark_pos = api.nvim_buf_get_extmark_by_id(s.bufnr, namespace, s.extmarks[s.jump_index], {})
-    -- make sure content and extmarks are ready before moving cursor
-    vim.schedule(function()
-        local ok = pcall(api.nvim_win_set_cursor, 0, { mark_pos[1] + 1, mark_pos[2] })
-        if not ok then
-            reset()
-        end
-    end)
+    local current_pos = api.nvim_win_get_cursor(0)
+    if current_pos[1] == mark_pos[1] and current_pos[2] == mark_pos[2] then
+        jump()
+        return
+    end
+
+    local ok = pcall(api.nvim_win_set_cursor, 0, { mark_pos[1] + 1, mark_pos[2] })
+    if not ok then
+        reset()
+        return
+    end
 
     if not can_jump(s.jump_index + 1) then
         reset()
@@ -211,7 +215,7 @@ local expand = function(snippet)
 
     del_text(s.row, trigger_start, trigger_end)
 
-    augroup("autocmd CursorMoved,CursorMovedI * lua require'minsnip'.check_pos()")
+    augroup("autocmd InsertLeave * lua require'minsnip'.reset()")
     s.jumping = true
     jump()
 
@@ -220,14 +224,6 @@ end
 
 -- exports
 local M = {}
-
-M.check_pos = function()
-    local row = api.nvim_win_get_cursor(0)[1]
-    local diff = row - s.row
-    if diff < 0 or diff >= s.range then
-        reset()
-    end
-end
 
 M.jump = function()
     if can_jump() then
@@ -251,8 +247,10 @@ M.setup = function(user_opts)
     o = vim.tbl_extend("force", o, user_opts)
 end
 
--- testing / debugging
-M.reset = function()
+M.reset = reset
+
+-- testing
+M._reset = function()
     reset(true)
     o = vim.deepcopy(defaults)
 end
