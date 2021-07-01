@@ -11,7 +11,7 @@ positions. What you see in the animation above is what you get.
 
 Minsnip uses Neovim's `extmarks` API to offload the heavy lifting of tracking
 positions and, as a result, does the job in 200-ish lines of code, an order of
-magnitude less than other implementations.
+magnitude fewer than other implementations.
 
 Minsnip does its best to stay out of your way and avoid affecting editor
 performance. When you're not jumping in a snippet, Minsnip does nothing. Once
@@ -32,6 +32,9 @@ Minsnip is **not** for you if:
 - You want to use a pre-existing library of snippets (there isn't one!)
 - You don't want to use Lua (you have to!)
 - You use Vim (it's Neovim-only!)
+
+Note that Minsnip requires the latest Neovim master and is not guaranteed to
+work on older versions.
 
 ## Defining snippets
 
