@@ -2,7 +2,7 @@
 
 An aggressively minimalistic snippet plugin.
 
-https://user-images.githubusercontent.com/54108223/124072438-b9532a80-da7b-11eb-89a1-8355291abb73.mov
+https://user-images.githubusercontent.com/54108223/124073016-82c9df80-da7c-11eb-8439-771e754caa92.mov
 
 ## Feature(s)
 
