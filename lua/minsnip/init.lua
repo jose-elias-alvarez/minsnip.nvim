@@ -26,7 +26,7 @@ local initial_state = {
 }
 local s = vim.deepcopy(initial_state)
 
--- local functions
+-- utils
 local parse_extended = function()
     if not o.extends[s.ft] then
         return
@@ -71,7 +71,7 @@ local del_text = function(row, start_col, end_col)
 end
 
 local make_extmark = function(row, col)
-    return api.nvim_buf_set_extmark(s.bufnr, namespace, row - 1, col, {})
+    return api.nvim_buf_set_extmark(s.bufnr, namespace, row - 1, col - 1, {})
 end
 
 local resolve_trigger = function(cursor, line)
@@ -113,17 +113,7 @@ local function jump(adjustment)
     end
 
     local mark_pos = api.nvim_buf_get_extmark_by_id(s.bufnr, namespace, s.extmarks[s.jump_index], {})
-    local current_pos = api.nvim_win_get_cursor(0)
-    if current_pos[1] == mark_pos[1] and current_pos[2] == mark_pos[2] then
-        jump()
-        return
-    end
-
-    local ok = pcall(api.nvim_win_set_cursor, 0, { mark_pos[1] + 1, mark_pos[2] })
-    if not ok then
-        reset()
-        return
-    end
+    api.nvim_win_set_cursor(0, { mark_pos[1] + 1, mark_pos[2] })
 
     if not can_jump(s.jump_index + 1) then
         reset()
@@ -147,10 +137,7 @@ local can_expand = function()
 end
 
 local expand = function(snippet)
-    local text = snippet
-    if type(snippet) == "function" then
-        text = snippet()
-    end
+    local text = type(snippet) == "function" and snippet() or snippet
     if not text then
         return false
     end
@@ -197,7 +184,7 @@ local expand = function(snippet)
     end)
 
     local trigger_start, trigger_end = s.line:find(s.trigger, s.col - #s.trigger)
-    local final = not has_final and make_extmark(s.row, trigger_end)
+    local final = not has_final and make_extmark(s.row, trigger_end + 1)
 
     api.nvim_buf_set_text(s.bufnr, s.row - 1, s.col, s.row - 1, s.col, adjusted)
 

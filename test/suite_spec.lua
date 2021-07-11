@@ -230,6 +230,16 @@ describe("suite", function()
             assert_cursor_at(1, 107)
         end)
 
+        it("should handle large number of consecutive jumps", function()
+            add_snippets({ ins = "print(vim.inspect($0)" })
+
+            for i = 0, 250 do
+                expand("ins")
+                assert_cursor_at(i + 1, 18)
+                input("i<CR>")
+            end
+        end)
+
         it("should jump across multiple lines", function()
             add_snippets({ func = [[
             function($1)
