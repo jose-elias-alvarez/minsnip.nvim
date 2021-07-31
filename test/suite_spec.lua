@@ -19,6 +19,12 @@ local assert_content = function(content)
     assert.same(get_lines(), content)
 end
 
+local luasnip = function(snip)
+    return function()
+        return vim.bo.ft == "lua" and snip
+    end
+end
+
 describe("suite", function()
     local minsnip = require("minsnip")
     api.nvim_set_keymap("i", "<Tab>", "<cmd> lua require'minsnip'.jump()<CR>", {})
@@ -41,7 +47,7 @@ describe("suite", function()
     end
 
     local add_snippets = function(snippets)
-        minsnip.setup({ snippets = { lua = snippets } })
+        minsnip.setup(snippets)
     end
 
     before_each(function()
@@ -50,7 +56,6 @@ describe("suite", function()
 
     after_each(function()
         vim.cmd("bufdo! bdelete!")
-        minsnip._reset()
     end)
 
     it("should create namespace", function()
@@ -61,7 +66,7 @@ describe("suite", function()
 
     describe("expand", function()
         it("should expand basic snippet", function()
-            add_snippets({ print = "print($0)" })
+            add_snippets({ print = luasnip("print($0)") })
 
             expand("print")
 
@@ -70,7 +75,7 @@ describe("suite", function()
         end)
 
         it("should do nothing on non-snippet", function()
-            add_snippets({ print = "print($0)" })
+            add_snippets({ print = luasnip("print($0)") })
 
             expand("non")
 
@@ -78,7 +83,7 @@ describe("suite", function()
         end)
 
         it("should generate and place cursor at end position", function()
-            add_snippets({ print = "print()" })
+            add_snippets({ print = luasnip("print()") })
 
             expand("print")
 
@@ -87,10 +92,10 @@ describe("suite", function()
         end)
 
         it("should expand multiline snippet", function()
-            add_snippets({ func = [[
+            add_snippets({ func = luasnip([[
             function()
                 $0
-            end]] })
+            end]]) })
 
             expand("func")
 
@@ -103,7 +108,7 @@ describe("suite", function()
         end)
 
         it("should expand snippet within snippet", function()
-            add_snippets({ print = "print($0)" })
+            add_snippets({ print = luasnip("print($0)") })
 
             expand("print")
             -- account for insert mode leave
@@ -116,11 +121,11 @@ describe("suite", function()
 
         it("should expand snippet within multiline snippet", function()
             add_snippets({
-                bff = [[
-            before_each(function()
-                $0
-            end)]],
-                print = "print($0)",
+                bff = luasnip([[
+                before_each(function()
+                    $0
+                end)]]),
+                print = luasnip("print($0)"),
             })
 
             expand("bff")
@@ -136,10 +141,10 @@ describe("suite", function()
 
         it("should expand multiline snippet within multiline snippet", function()
             add_snippets({
-                bff = [[
-            before_each(function()
-                $0
-            end)]],
+                bff = luasnip([[
+                before_each(function()
+                    $0
+                end)]]),
             })
 
             expand("bff")
@@ -154,30 +159,11 @@ describe("suite", function()
             })
             assert_cursor_at(3, 7)
         end)
-
-        it("should expand table snippet", function()
-            add_snippets({
-                bff = {
-                    "before_each(function()",
-                    "    $0",
-                    "end)",
-                },
-            })
-
-            expand("bff")
-
-            assert_content({
-                "before_each(function()",
-                "    ",
-                "end)",
-            })
-            assert_cursor_at(2, 4)
-        end)
     end)
 
     describe("jump", function()
         it("should jump forwards", function()
-            add_snippets({ print = "print($1, $0)" })
+            add_snippets({ print = luasnip("print($1, $0)") })
 
             expand_and_jump("print", { 1 })
 
@@ -185,7 +171,7 @@ describe("suite", function()
         end)
 
         it("should jump backwards", function()
-            add_snippets({ print = "print($1, $2)" })
+            add_snippets({ print = luasnip("print($1, $2)") })
 
             expand_and_jump("print", { 1, -1 })
 
@@ -193,7 +179,7 @@ describe("suite", function()
         end)
 
         it("should skip over missing position", function()
-            add_snippets({ print = "print($1, $9)" })
+            add_snippets({ print = luasnip("print($1, $9)") })
 
             expand_and_jump("print", { 1 })
 
@@ -201,7 +187,7 @@ describe("suite", function()
         end)
 
         it("should handle double position", function()
-            add_snippets({ print = "print($1, $1)" })
+            add_snippets({ print = luasnip("print($1, $1)") })
 
             expand_and_jump("print", { 1 })
 
@@ -209,7 +195,7 @@ describe("suite", function()
         end)
 
         it("should handle large number positions", function()
-            add_snippets({ print = "print($111111, $99999999)" })
+            add_snippets({ print = luasnip("print($111111, $99999999)") })
 
             expand_and_jump("print", { 1 })
 
@@ -223,7 +209,7 @@ describe("suite", function()
                 table.insert(jumps, 1)
             end
             snippet = snippet .. ")"
-            add_snippets({ print = snippet })
+            add_snippets({ print = luasnip(snippet) })
 
             expand_and_jump("print", jumps)
 
@@ -231,7 +217,7 @@ describe("suite", function()
         end)
 
         it("should handle large number of consecutive jumps", function()
-            add_snippets({ ins = "print(vim.inspect($0)" })
+            add_snippets({ ins = luasnip("print(vim.inspect($0)") })
 
             for i = 0, 250 do
                 expand("ins")
@@ -241,10 +227,10 @@ describe("suite", function()
         end)
 
         it("should jump across multiple lines", function()
-            add_snippets({ func = [[
+            add_snippets({ func = luasnip([[
             function($1)
                 $0
-            end]] })
+            end]]) })
 
             expand_and_jump("func", { 1 })
 
@@ -252,101 +238,14 @@ describe("suite", function()
         end)
 
         it("should jump backwards across multiple lines", function()
-            add_snippets({ func = [[
+            add_snippets({ func = luasnip([[
             function($1)
                 $2
-            end]] })
+            end]]) })
 
             expand_and_jump("func", { 1, -1 })
 
             assert_cursor_at(1, 9)
-        end)
-    end)
-
-    describe("state", function()
-        it("should reset state after expanding", function()
-            add_snippets({ print = "print($0)" })
-
-            expand("print")
-
-            local state = minsnip.inspect().state
-            assert.equals(state.jumping, false)
-            assert.equals(state.jump_index, 0)
-            assert.equals(state.bufnr, nil)
-            assert.equals(state.ft, nil)
-            assert.equals(state.trigger, nil)
-            assert.equals(state.row, nil)
-            assert.equals(state.col, nil)
-            assert.equals(state.line, nil)
-            assert.equals(state.range, 0)
-            assert.equals(vim.tbl_count(state.extmarks), 0)
-        end)
-
-        it("should remove extmarks after expanding", function()
-            add_snippets({ print = "print($0)" })
-            expand("print")
-
-            local extmarks = api.nvim_buf_get_extmarks(0, minsnip.inspect().namespace, 0, -1, {})
-            assert.equals(vim.tbl_count(extmarks), 0)
-        end)
-    end)
-
-    describe("extends", function()
-        it("should get and expand snippet from extended filetype", function()
-            minsnip.setup({
-                snippets = {
-                    typescript = { clg = "console.log($1);" },
-                },
-                extends = { typescriptreact = { "typescript" } },
-            })
-            vim.cmd("e test.tsx")
-
-            expand("clg")
-
-            assert_content({ "console.log();" })
-            assert_cursor_at(1, 12)
-        end)
-
-        it("should add filetype to _parsed", function()
-            minsnip.setup({
-                snippets = {
-                    typescript = { clg = "console.log($1);" },
-                },
-                extends = { typescriptreact = { "typescript" } },
-            })
-            vim.cmd("e test.tsx")
-
-            expand("clg")
-
-            assert.same(minsnip.inspect().options._parsed, { "typescriptreact" })
-        end)
-
-        it("should do nothing if snippet not found", function()
-            minsnip.setup({
-                snippets = {
-                    typescript = { clg = "console.log($1);" },
-                },
-                extends = { typescriptreact = { "typescript" } },
-            })
-            vim.cmd("e test.tsx")
-
-            expand("clq")
-
-            assert_content({ "clq" })
-        end)
-
-        it("should do nothing if no extended filetype", function()
-            minsnip.setup({
-                snippets = {
-                    typescript = { clg = "console.log($1);" },
-                },
-                extends = { teal = { "lua" } },
-            })
-            vim.cmd("e test.tsx")
-
-            expand("clg")
-
-            assert_content({ "clg" })
         end)
     end)
 end)

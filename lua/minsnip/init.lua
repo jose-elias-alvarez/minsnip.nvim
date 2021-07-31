@@ -2,64 +2,28 @@ local api = vim.api
 
 local namespace = api.nvim_create_namespace("minsnip")
 
--- options
-local defaults = {
-    snippets = {},
-    extends = {},
-    _parsed = {},
-}
-
-local o = vim.deepcopy(defaults)
+local snippets = {}
 
 -- state
 local initial_state = {
     jumping = false,
     jump_index = 0,
     bufnr = nil,
-    ft = nil,
     trigger = nil,
     row = nil,
     col = nil,
     line = nil,
-    range = 0,
     extmarks = {},
 }
 local s = vim.deepcopy(initial_state)
 
--- utils
-local parse_extended = function()
-    if not o.extends[s.ft] then
-        return
-    end
-
-    for _, extended in ipairs(o.extends[s.ft]) do
-        o.snippets[s.ft] = vim.tbl_extend("force", o.snippets[s.ft] or {}, o.snippets[extended])
-    end
-    table.insert(o._parsed, s.ft)
-end
-
-local get_snippet = function()
-    return o.snippets[s.ft] and o.snippets[s.ft][s.trigger]
-end
-
-local resolve_snippet = function()
-    local snippet = get_snippet()
-    if not snippet and not vim.tbl_contains(o._parsed, s.ft) then
-        parse_extended()
-        snippet = get_snippet()
-    end
-
-    return snippet
-end
-
 local augroup = function(autocmd)
     api.nvim_exec(
         string.format(
-            [[
-        augroup Minsnip
-            autocmd!
-            %s
-        augroup END]],
+            [[augroup Minsnip
+                autocmd!
+                %s
+            augroup END]],
             autocmd or ""
         ),
         false
@@ -127,28 +91,26 @@ local can_expand = function()
     local line = api.nvim_get_current_line()
 
     s.bufnr = api.nvim_get_current_buf()
-    s.ft = vim.bo.ft
     s.trigger = resolve_trigger(cursor, line)
     s.line = line
     s.row = cursor[1]
     s.col = cursor[2]
 
-    return resolve_snippet()
+    return snippets[s.trigger]
 end
 
 local expand = function(snippet)
-    local text = type(snippet) == "function" and snippet() or snippet
+    local text = snippet()
     if not text then
         return false
     end
 
-    local split = type(text) == "string" and vim.split(text, "\n") or text
+    local split = vim.split(text, "\n")
     local snip_indent = split[1]:match("^%s+")
     local line_indent = s.line:match("^%s+")
 
     local positions, adjusted, has_final = {}, {}, false
     for split_row, split_text in ipairs(split) do
-        s.range = s.range + 1
         for match in split_text:gmatch("%$%d+") do
             if not has_final and match == "$0" then
                 has_final = true
@@ -230,20 +192,27 @@ M.jump_backwards = function()
     jump(-1)
 end
 
-M.setup = function(user_opts)
-    o = vim.tbl_extend("force", o, user_opts)
+M.setup = function(user_snippets)
+    snippets = user_snippets
 end
 
 M.reset = reset
-
--- testing
-M._reset = function()
-    reset(true)
-    o = vim.deepcopy(defaults)
-end
-
-M.inspect = function()
-    return { options = o, state = s, namespace = namespace }
-end
+local snippets = {
+    -- global snippet
+    clip = function()
+        return vim.fn.getreg("*")
+    end,
+    -- filetype-specific snippet
+    print = function()
+        return vim.bo.ft == "lua" and "print($1)"
+    end,
+    -- bracket strings work, too
+    func = function()
+        return vim.bo.ft == "lua" and [[
+    function($1)
+        $0
+    end]]
+    end,
+}
 
 return M

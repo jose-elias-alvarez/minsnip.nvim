@@ -10,18 +10,14 @@ Minsnip does one thing: it lets you expand defined snippets and jump between
 positions. What you see in the animation above is what you get.
 
 Minsnip uses Neovim's `extmarks` API to offload the heavy lifting of tracking
-positions and, as a result, does the job in 200-ish lines of code, an order of
+positions and, as a result, does the job in 150-ish lines of code, an order of
 magnitude fewer than other implementations.
-
-Minsnip does its best to stay out of your way and avoid affecting editor
-performance. When you're not jumping in a snippet, Minsnip does nothing. Once
-you're done, it wipes itself out until you call it again.
 
 Minsnip _may_ be for you if:
 
 - You value simplicity and speed over features
 - You are comfortable with Lua and the Neovim API
-- You prefer to create your own snippets
+- You don't mind creating your own snippets
 - You want to build a custom solution on top of a simple base
 
 Minsnip is **not** for you if:
@@ -33,33 +29,33 @@ Minsnip is **not** for you if:
 - You don't want to use Lua (you have to!)
 - You use Vim (it's Neovim-only!)
 
-Note that Minsnip requires the latest Neovim master and is not guaranteed to
-work on older versions.
-
 ## Defining snippets
+
+All Minsnip snippets are functions that return strings or `nil`.
 
 ```lua
 local snippets = {
-    lua = {
-        -- string
-        print = "print($1)",
-
-        -- bracket strings work, too
-        func = [[
+    -- global snippet
+    clip = function()
+        return vim.fn.getreg("*")
+    end,
+    -- filetype-specific snippet
+    print = function()
+        return vim.bo.ft == "lua" and "print($1)"
+    end,
+    -- use the same trigger for more than one filetype
+    func = function()
+        return vim.bo.ft == "lua" and [[
         function($1)
             $0
-        end]],
-
-        -- lists work, but bracket strings are better, right?
-        lfunc = { "local $1 = ($2)", "\t$0", "end" },
-
-        -- functions also work (more on that below)
-        clip = function()
-            return vim.fn.getreg("*")
-        end
-    },
+        end]] or vim.bo.ft == "javascript" and [[
+        const $1 = ($2) => {
+            $0
+        };]]
+    end,
 }
-require("minsnip").setup({ snippets = snippets })
+
+require("minsnip").setup(snippets)
 ```
 
 Using functions as snippets is both simple and powerful. For example, the
@@ -69,38 +65,41 @@ and return a formatted plugin `use` statement for
 
 ```lua
 local snippets = {
-    lua = {
-        use = function()
-            return string.format('use "%s"', vim.fn.getreg("*"):gsub("https://github.com/", ""))
-        end,
-    }
+    use = function()
+        return vim.bo.ft == "lua" and string.format('use "%s"', vim.fn.getreg("*"):gsub("https://github.com/", ""))
+    end,
 }
 ```
 
 ## Positions
 
-Snippets can have any number of positions, each consisting of a `$` followed by
-a number. Like other implementations, `$0` is a special case denoting the final
+Snippets can have any number of positions, defined by a `$` followed by a
+number. Like other implementations, `$0` is a special case denoting the final
 jump, and Minsnip will insert a final position at the end of the snippet if you
 don't specifically define one.
 
-```lua
--- this is OK,
+This is OK:
+
+```txt
 print($1, $2)
+```
 
--- but it's better to explicitly define a final position
+But it's better to explicitly define a final position when possible:
+
+```txt
 print($1, $0)
+```
 
--- missing positions get skipped
+Missing positions get skipped, so the following snippet will jump from `$1` to `$9`:
+
+```txt
 print($1, $9)
 ```
 
 Unlike other implementations, Minsnip does not "link" identical positions.
-Minsnip treats each position in this snippet as an independent position:
+The following snippet will jump from the first `$1` to the second:
 
-```lua
--- expanding moves the cursor to the first $1,
--- and the next jump goes to the second
+```txt
 print($1, $1)
 ```
 
@@ -135,21 +134,19 @@ vim.api.nvim_set_keymap("i", "<Tab>", "<cmd> lua tab_complete()<CR>", {})
 ```
 
 Why? Combining a conditional map with function snippets lets you create
-_conditional snippets_, just like the big boys.
+_conditional snippets_. Any snippet that returns `nil` will cause Neovim to fall
+back to whatever you've defined in your conditional map.
 
 For example, the following snippet will trigger if the cursor is on the first
-line of the buffer and fall back to whatever you've defined in your conditional
-map otherwise:
+line of the buffer:
 
 ```lua
 local snippets = {
-    lua = {
-        flo = function()
-            if vim.api.nvim_win_get_cursor(0)[1] == 1 then
-                return "I am at the top of this file!"
-            end
-        end,
-    }
+    flo = function()
+        if vim.api.nvim_win_get_cursor(0)[1] == 1 then
+            return "I am at the top of this file!"
+        end
+    end,
 }
 ```
 
@@ -163,69 +160,25 @@ local first_line_only = function(snippet)
 end
 
 local snippets = {
-    lua = {
-        top = first_line_only("I am the first line of this file!"),
-    },
+    top = first_line_only("I am the first line of this file!"),
 }
 ```
 
 Instead of filling the plugin with features you _might_ use, Minsnip's goal is
-to make it simple to write the snippets you _want_ to use.
+to let you focus on writing the snippets you _want_ to use.
 
-## Extending filetypes
+## Examples
 
-You can extend one filetype's snippets with another's by passing a list of
-filetypes to `setup` under the key `extends`, as in the example below:
+Take a look at my
+[snippets](https://github.com/jose-elias-alvarez/dotfiles/blob/main/.config/nvim/lua/snippets.lua)
+for examples of the wrappers I use to simplify snippet creation.
 
-```lua
-local snippets = {
-    typescript = {
-        clg = "console.log($1);",
-    },
+## Status
 
-    typescriptreact = {
-        ifp = [[
-        interface Props {
-            $0
-        }]]
-    }
-}
-
-require("minsnip").setup({
-    snippets = snippets,
-    -- will enable typescript snippets when using typescriptreact
-    extends = { typescriptreact = { "typescript" } },
-})
-```
-
-## Contributions
-
-Minsnip is in **alpha status**, and you may run into bugs in normal usage.
-Bug reports and fixes are greatly appreciated.
-
-Feature requests and contributions are also welcome, but please note that I will
-continue to err towards the side of minimalism. If built-in features are what
-you're after, I recommend trying one of the alternatives listed below.
+I built Minsnip to fit my limited snippet needs, and so I consider it more or
+less done (apart from bugs). If you're looking for more than what's offered
+here, please try one of the other snippet plugins available for Vim / Neovim.
 
 ## Testing
 
 Run `make test` in the root directory.
-
-## Alternatives
-
-- [UltiSnips](https://github.com/SirVer/ultisnips): has a ton of features and a
-  custom `snippets` format that's ergonomic and easy to use. It integrates with
-  [vim-snippets](https://github.com/honza/vim-snippets), a repository with a
-  large selection of snippets for most languages. Drawbacks are performance and
-  a gigantic code base that makes it hard (at least for me) to understand what's
-  going on.
-
-- [vim-vsnip](https://github.com/hrsh7th/vim-vsnip): supports JSON snippets in
-  the same format as VS Code, meaning you can use snippets from VS Code
-  extensions. Also supports LSP snippets and integrates with popular completion
-  engines. I used vim-vsnip for a long time and am a fan of everything except
-  writing my own JSON snippets, which is awful.
-
-- [snippets.nvim](https://github.com/norcalli/snippets.nvim): a powerful
-  plugin written in Lua that I, personally, was never able to wrap my head
-  around. Hasn't seen an update for some time as of this writing.
