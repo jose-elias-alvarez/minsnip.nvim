@@ -197,22 +197,5 @@ M.setup = function(user_snippets)
 end
 
 M.reset = reset
-local snippets = {
-    -- global snippet
-    clip = function()
-        return vim.fn.getreg("*")
-    end,
-    -- filetype-specific snippet
-    print = function()
-        return vim.bo.ft == "lua" and "print($1)"
-    end,
-    -- bracket strings work, too
-    func = function()
-        return vim.bo.ft == "lua" and [[
-    function($1)
-        $0
-    end]]
-    end,
-}
 
 return M
