@@ -25,7 +25,7 @@ local luasnip = function(snip)
     end
 end
 
-describe("suite", function()
+describe("minsnip", function()
     local minsnip = require("minsnip")
     api.nvim_set_keymap("i", "<Tab>", "<cmd> lua require'minsnip'.jump()<CR>", {})
     api.nvim_set_keymap("i", "<S-Tab>", "<cmd> lua require'minsnip'.jump_backwards()<CR>", {})
