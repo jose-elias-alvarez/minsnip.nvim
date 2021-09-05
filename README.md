@@ -1,3 +1,10 @@
+<!-- markdownlint-configure-file
+{
+  "line-length": false,
+  "no-bare-urls": false
+}
+-->
+
 # minsnip.nvim
 
 An aggressively minimalistic snippet plugin.
@@ -10,7 +17,7 @@ Minsnip does one thing: it lets you expand defined snippets and jump between
 positions. What you see in the animation above is what you get.
 
 Minsnip uses Neovim's `extmarks` API to offload the heavy lifting of tracking
-positions and, as a result, does the job in 150-ish lines of code, an order of
+positions and, as a result, does the job in 200-ish lines of code, an order of
 magnitude fewer than other implementations.
 
 Minsnip _may_ be for you if:
@@ -22,9 +29,8 @@ Minsnip _may_ be for you if:
 
 Minsnip is **not** for you if:
 
-- You want built-in features like linked snippets, recursive expansion,
-  automatic expansion, LSP snippets, or integration with completion plugins
-  (they're not implemented!)
+- You want built-in features like linked snippets, recursive expansion, or
+  automatic expansion (they're not implemented, but you could do it yourself!)
 - You want to use a pre-existing library of snippets (there isn't one!)
 - You don't want to use Lua (you have to!)
 - You use Vim (it's Neovim-only!)
@@ -167,17 +173,60 @@ local snippets = {
 Instead of filling the plugin with features you _might_ use, Minsnip's goal is
 to let you focus on writing the snippets you _want_ to use.
 
+## nvim-cmp integration
+
+Minsnip provides a minimal integration with
+[nvim-cmp](https://github.com/hrsh7th/nvim-cmp). The following code block shows
+how to set it up, with example mappings for `<Tab>` and `<S-Tab>`:
+
+```lua
+local cmp = require("cmp")
+local minsnip = require("minsnip")
+
+cmp.setup({
+    -- required
+    snippet = {
+        expand = function(args)
+            minsnip.expand_anonymous(args.body)
+        end,
+    },
+    -- add to the other sources you're using
+    sources = {
+        { name = "minsnip" },
+    },
+    -- optional
+    mapping = {
+        ["<Tab>"] = function(fallback)
+            if vim.fn.pumvisible() == 1 then
+                vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<C-p>", true, true, true), "n")
+            elseif not minsnip.jump() then
+                fallback()
+            end
+        end,
+        ["<S-Tab>"] = function(fallback)
+            if vim.fn.pumvisible() == 1 then
+                vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<C-p>", true, true, true), "n")
+            elseif not minsnip.jump_backwards() then
+                fallback()
+            end
+        end,
+    },
+})
+```
+
+Note the following limitations:
+
+- The popup menu always shows all registered snippets, since Minsnip can't
+  determine whether a snippet is valid for the current filetype without
+  expanding it (which could cause side effects).
+- Minsnip ignores placeholders in LSP snippets and can't handle nested
+  placeholders.
+
 ## Examples
 
 Take a look at my
 [snippets](https://github.com/jose-elias-alvarez/dotfiles/blob/main/.config/nvim/lua/snippets.lua)
 for examples of the wrappers I use to simplify snippet creation.
-
-## Status
-
-I built Minsnip to fit my limited snippet needs, and so I consider it more or
-less done (apart from bugs). If you're looking for more than what's offered
-here, please try one of the other snippet plugins available for Vim / Neovim.
 
 ## Testing
 

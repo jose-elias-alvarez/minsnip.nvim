@@ -111,9 +111,9 @@ local initialize_state = function()
     s.col = cursor[2]
 end
 
-local can_expand = function()
+local can_expand = function(trigger)
     initialize_state()
-    return snippets[s.trigger]
+    return snippets[trigger or s.trigger]
 end
 
 local expand = function(snippet)
@@ -200,6 +200,12 @@ end
 -- exports
 local M = {}
 
+M.snippets = snippets
+
+M.reset_snippets = function()
+    snippets = {}
+end
+
 M.jump = function()
     if can_jump() then
         return jump()
@@ -223,8 +229,6 @@ M.setup = function(user_snippets)
     end
 end
 
-M.snippets = snippets
-
 M.expand_anonymous = function(body)
     initialize_state()
 
@@ -235,7 +239,12 @@ M.expand_anonymous = function(body)
         return body
     end
 
-    M.jump()
+    return M.jump()
+end
+
+M.expand_by_name = function(name)
+    local snippet = can_expand(name)
+    return snippet and expand(snippet) or false
 end
 
 M.reset = reset
