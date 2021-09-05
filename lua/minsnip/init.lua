@@ -222,7 +222,7 @@ M.jump = function()
 end
 
 M.jump_backwards = function()
-    return jump(-1)
+    return can_jump(s.jump_index - 1) and jump(-1)
 end
 
 M.expand_anonymous = function(body)
