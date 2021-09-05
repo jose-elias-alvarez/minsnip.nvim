@@ -2,13 +2,14 @@ local api = vim.api
 
 local input = function(keys)
     api.nvim_feedkeys(api.nvim_replace_termcodes(keys, true, false, true), "x", true)
+    vim.wait(0)
 end
 
 local assert_cursor_at = function(row, col)
     local cursor = api.nvim_win_get_cursor(0)
 
     assert.equals(cursor[1], row)
-    assert.equals(cursor[2], col - 1)
+    assert.equals(cursor[2], col)
 end
 
 local get_lines = function()
@@ -88,7 +89,7 @@ describe("minsnip", function()
             expand("print")
 
             assert_content({ "print()" })
-            assert_cursor_at(1, 7)
+            assert_cursor_at(1, 6)
         end)
 
         it("should expand multiline snippet", function()
@@ -104,7 +105,7 @@ describe("minsnip", function()
                 "    ",
                 "end",
             })
-            assert_cursor_at(2, 4)
+            assert_cursor_at(2, 3)
         end)
 
         it("should expand snippet within snippet", function()
@@ -157,7 +158,7 @@ describe("minsnip", function()
                 "   end) ",
                 "end)",
             })
-            assert_cursor_at(3, 7)
+            assert_cursor_at(3, 6)
         end)
     end)
 
@@ -213,7 +214,7 @@ describe("minsnip", function()
 
             expand_and_jump("print", jumps)
 
-            assert_cursor_at(1, 107)
+            assert_cursor_at(1, 106)
         end)
 
         it("should handle large number of consecutive jumps", function()
@@ -234,7 +235,7 @@ describe("minsnip", function()
 
             expand_and_jump("func", { 1 })
 
-            assert_cursor_at(2, 4)
+            assert_cursor_at(2, 3)
         end)
 
         it("should jump backwards across multiple lines", function()

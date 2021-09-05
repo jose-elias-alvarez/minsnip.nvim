@@ -77,11 +77,12 @@ local function jump(adjustment)
     end
 
     local mark_pos = api.nvim_buf_get_extmark_by_id(s.bufnr, namespace, s.extmarks[s.jump_index], {})
-    api.nvim_win_set_cursor(0, { mark_pos[1] + 1, mark_pos[2] })
-
-    if not can_jump(s.jump_index + 1) then
-        reset()
-    end
+    vim.schedule(function()
+        api.nvim_win_set_cursor(0, { mark_pos[1] + 1, mark_pos[2] })
+        if not can_jump(s.jump_index + 1) then
+            reset()
+        end
+    end)
 end
 
 local can_expand = function()
