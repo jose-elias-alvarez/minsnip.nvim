@@ -3,6 +3,7 @@ local api = vim.api
 local namespace = api.nvim_create_namespace("minsnip")
 
 local snippets = {}
+local anon_trigger = "_anon"
 
 -- state
 local initial_state = {
@@ -15,6 +16,7 @@ local initial_state = {
     line = nil,
     extmarks = {},
 }
+
 local s = vim.deepcopy(initial_state)
 
 local augroup = function(autocmd)
@@ -43,7 +45,7 @@ local resolve_trigger = function(cursor, line)
     -- iterate backwards from cursor position until non-alphanumeric char is found
     for i = cursor[2], 0, -1 do
         local char = line:sub(i, i)
-        if char:match("%W") then
+        if char:match("%W") and char ~= "_" then
             break
         end
 
@@ -85,7 +87,7 @@ local function jump(adjustment)
     end)
 end
 
-local can_expand = function()
+local initialize_state = function()
     reset()
 
     local cursor = api.nvim_win_get_cursor(0)
@@ -96,7 +98,10 @@ local can_expand = function()
     s.line = line
     s.row = cursor[1]
     s.col = cursor[2]
+end
 
+local can_expand = function()
+    initialize_state()
     return snippets[s.trigger]
 end
 
@@ -194,7 +199,24 @@ M.jump_backwards = function()
 end
 
 M.setup = function(user_snippets)
-    snippets = user_snippets
+    for k, v in pairs(user_snippets) do
+        snippets[k] = v
+    end
+end
+
+M.snippets = snippets
+
+M.expand_anonymous = function(body)
+    initialize_state()
+
+    api.nvim_buf_set_text(s.bufnr, s.row - 1, s.col, s.row - 1, s.col, { anon_trigger })
+    api.nvim_win_set_cursor(0, { s.row, s.col + #anon_trigger })
+    snippets[anon_trigger] = function()
+        snippets[anon_trigger] = nil
+        return body
+    end
+
+    M.jump()
 end
 
 M.reset = reset

@@ -28,8 +28,6 @@ end
 
 describe("minsnip", function()
     local minsnip = require("minsnip")
-    api.nvim_set_keymap("i", "<Tab>", "<cmd> lua require'minsnip'.jump()<CR>", {})
-    api.nvim_set_keymap("i", "<S-Tab>", "<cmd> lua require'minsnip'.jump_backwards()<CR>", {})
 
     local expand = function(trigger)
         input(string.format("i%s<Tab>", trigger))
@@ -52,10 +50,16 @@ describe("minsnip", function()
     end
 
     before_each(function()
+        api.nvim_set_keymap("i", "<Tab>", "<cmd> lua require'minsnip'.jump()<CR>", {})
+        api.nvim_set_keymap("i", "<S-Tab>", "<cmd> lua require'minsnip'.jump_backwards()<CR>", {})
+
         vim.cmd("e test.lua")
     end)
 
     after_each(function()
+        api.nvim_del_keymap("i", "<Tab>")
+        api.nvim_del_keymap("i", "<S-Tab>")
+
         vim.cmd("bufdo! bdelete!")
     end)
 
@@ -159,6 +163,24 @@ describe("minsnip", function()
                 "end)",
             })
             assert_cursor_at(3, 6)
+        end)
+    end)
+
+    describe("expand_anonymous", function()
+        before_each(function()
+            api.nvim_set_keymap("i", "<M-Tab>", "<cmd> lua require'minsnip'.expand_anonymous('print($0)')<CR>", {})
+        end)
+        after_each(function()
+            api.nvim_del_keymap("i", "<M-Tab>")
+        end)
+
+        it("should expand anonymous snippet", function()
+            input("i<M-Tab>")
+
+            vim.wait(0)
+
+            assert_content({ "print()" })
+            assert_cursor_at(1, 6)
         end)
     end)
 
