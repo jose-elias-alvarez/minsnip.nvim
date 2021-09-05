@@ -70,6 +70,15 @@ local reset = function(force)
     s = vim.deepcopy(initial_state)
 end
 
+local has_final = function(positions)
+    for _, pos in ipairs(positions) do
+        if pos.index == 0 then
+            return true
+        end
+    end
+    return false
+end
+
 -- main
 local function jump(adjustment)
     s.jump_index = s.jump_index + (adjustment or 1)
@@ -115,14 +124,22 @@ local expand = function(snippet)
     local snip_indent = split[1]:match("^%s+")
     local line_indent = s.line:match("^%s+")
 
-    local positions, adjusted, has_final = {}, {}, false
+    local positions, adjusted = {}, {}
     for split_row, split_text in ipairs(split) do
-        for match in split_text:gmatch("%$%d+") do
-            if not has_final and match == "$0" then
-                has_final = true
+        local match_from_pattern = function(pattern)
+            for match in split_text:gmatch(pattern) do
+                table.insert(positions, {
+                    match = match,
+                    row = split_row,
+                    index = tonumber(match:match("%d+")),
+                })
             end
-            table.insert(positions, { match = match, row = split_row })
         end
+
+        -- normal positions ($0, $1)
+        match_from_pattern("%$%d+")
+        -- positions with placeholders (${1:placeholder})
+        match_from_pattern("%${%d+:%w+}")
 
         -- adjust to account for [[]] snippet indentation
         if snip_indent then
@@ -131,6 +148,7 @@ local expand = function(snippet)
                 split_text = split_text:sub(indent_end + 1)
             end
         end
+
         -- adjust to account for existing indentation
         if line_indent and split_row > 1 then
             split_text = line_indent .. split_text
@@ -140,19 +158,19 @@ local expand = function(snippet)
     end
 
     table.sort(positions, function(a, b)
-        -- make sure $0 is always last
-        if a.match == "$0" then
+        -- make sure 0 is always last
+        if a.index == 0 then
             return false
         end
-        if b.match == "$0" then
+        if b.index == 0 then
             return true
         end
 
-        return tonumber(a.match:match("%d")) < tonumber(b.match:match("%d"))
+        return a.index < b.index
     end)
 
     local trigger_start, trigger_end = s.line:find(s.trigger, s.col - #s.trigger)
-    local final = not has_final and make_extmark(s.row, trigger_end + 1)
+    local final = not has_final(positions) and make_extmark(s.row, trigger_end + 1)
 
     api.nvim_buf_set_text(s.bufnr, s.row - 1, s.col, s.row - 1, s.col, adjusted)
 

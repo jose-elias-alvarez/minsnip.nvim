@@ -164,6 +164,19 @@ describe("minsnip", function()
             })
             assert_cursor_at(3, 6)
         end)
+
+        it("should expand snippet with placeholders", function()
+            add_snippets({ ["for"] = luasnip("for ${1:index}, ${2:value} in ipairs(${3:t}) do\n\t$0\nend") })
+
+            expand("for")
+
+            assert_content({
+                "for ,  in ipairs() do",
+                "\t",
+                "end",
+            })
+            assert_cursor_at(1, 4)
+        end)
     end)
 
     describe("expand_anonymous", function()
@@ -269,6 +282,14 @@ describe("minsnip", function()
             expand_and_jump("func", { 1, -1 })
 
             assert_cursor_at(1, 9)
+        end)
+
+        it("should jump in snippet with placeholders", function()
+            add_snippets({ ["for"] = luasnip("for ${1:index}, ${2:value} in ipairs(${3:t}) do\n\t$0\nend") })
+
+            expand_and_jump("for", { 1 })
+
+            assert_cursor_at(1, 6)
         end)
     end)
 end)
