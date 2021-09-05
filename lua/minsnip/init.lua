@@ -84,7 +84,7 @@ local function jump(adjustment)
     s.jump_index = s.jump_index + (adjustment or 1)
     if not can_jump() then
         reset()
-        return
+        return false
     end
 
     local mark_pos = api.nvim_buf_get_extmark_by_id(s.bufnr, namespace, s.extmarks[s.jump_index], {})
@@ -94,6 +94,8 @@ local function jump(adjustment)
             reset()
         end
     end)
+
+    return true
 end
 
 local initialize_state = function()
@@ -200,8 +202,7 @@ local M = {}
 
 M.jump = function()
     if can_jump() then
-        jump()
-        return true
+        return jump()
     end
 
     local snippet = can_expand()
@@ -213,7 +214,7 @@ M.jump = function()
 end
 
 M.jump_backwards = function()
-    jump(-1)
+    return jump(-1)
 end
 
 M.setup = function(user_snippets)
