@@ -5,19 +5,14 @@ local namespace = api.nvim_create_namespace("minsnip")
 local snippets = {}
 local anon_trigger = "_anon"
 
--- state
-local initial_state = {
-    jumping = false,
-    jump_index = 0,
-    bufnr = nil,
-    trigger = nil,
-    row = nil,
-    col = nil,
-    line = nil,
-    extmarks = {},
-}
+-- utils
+local del_text = function(bufnr, row, start_col, end_col)
+    api.nvim_buf_set_text(bufnr, row - 1, start_col - 1, row - 1, end_col, {})
+end
 
-local s = vim.deepcopy(initial_state)
+local make_extmark = function(bufnr, row, col)
+    return api.nvim_buf_set_extmark(bufnr, namespace, row - 1, col - 1, {})
+end
 
 local augroup = function(autocmd)
     api.nvim_exec(
@@ -32,29 +27,44 @@ local augroup = function(autocmd)
     )
 end
 
-local del_text = function(row, start_col, end_col)
-    api.nvim_buf_set_text(s.bufnr, row - 1, start_col - 1, row - 1, end_col, {})
-end
-
-local make_extmark = function(row, col)
-    return api.nvim_buf_set_extmark(s.bufnr, namespace, row - 1, col - 1, {})
-end
-
-local resolve_trigger = function(cursor, line)
-    local word = ""
+local resolve_trigger = function(col, line)
+    local trigger = ""
     -- iterate backwards from cursor position until non-alphanumeric char is found
-    for i = cursor[2], 0, -1 do
+    for i = col, 0, -1 do
         local char = line:sub(i, i)
         if char:match("%W") and char ~= "_" then
             break
         end
 
-        word = word .. char
+        trigger = trigger .. char
     end
 
     -- reverse to account for backwards iteration
-    return word:reverse()
+    return trigger:reverse()
 end
+
+local has_final = function(positions)
+    for _, pos in ipairs(positions) do
+        if pos.index == 0 then
+            return true
+        end
+    end
+    return false
+end
+
+-- state
+local initial_state = {
+    jumping = false,
+    jump_index = 0,
+    bufnr = nil,
+    trigger = nil,
+    row = nil,
+    col = nil,
+    line = nil,
+    extmarks = {},
+}
+
+local s = vim.deepcopy(initial_state)
 
 local can_jump = function(index)
     return s.jumping and s.extmarks[index or s.jump_index]
@@ -70,13 +80,17 @@ local reset = function(force)
     s = vim.deepcopy(initial_state)
 end
 
-local has_final = function(positions)
-    for _, pos in ipairs(positions) do
-        if pos.index == 0 then
-            return true
-        end
-    end
-    return false
+local initialize_state = function()
+    reset()
+
+    local row, col = unpack(api.nvim_win_get_cursor(0))
+    local line = api.nvim_get_current_line()
+
+    s.bufnr = api.nvim_get_current_buf()
+    s.trigger = resolve_trigger(col, line)
+    s.line = line
+    s.row = row
+    s.col = col
 end
 
 -- main
@@ -96,19 +110,6 @@ local function jump(adjustment)
     end)
 
     return true
-end
-
-local initialize_state = function()
-    reset()
-
-    local cursor = api.nvim_win_get_cursor(0)
-    local line = api.nvim_get_current_line()
-
-    s.bufnr = api.nvim_get_current_buf()
-    s.trigger = resolve_trigger(cursor, line)
-    s.line = line
-    s.row = cursor[1]
-    s.col = cursor[2]
 end
 
 local can_expand = function(trigger)
@@ -172,7 +173,7 @@ local expand = function(snippet)
     end)
 
     local trigger_start, trigger_end = s.line:find(s.trigger, s.col - #s.trigger)
-    local final = not has_final(positions) and make_extmark(s.row, trigger_end + 1)
+    local final = not has_final(positions) and make_extmark(s.bufnr, s.row, trigger_end + 1)
 
     api.nvim_buf_set_text(s.bufnr, s.row - 1, s.col, s.row - 1, s.col, adjusted)
 
@@ -181,14 +182,15 @@ local expand = function(snippet)
         local line = api.nvim_buf_get_lines(s.bufnr, abs_row - 1, abs_row, true)[1]
         local pos_start, pos_end = line:find(pos.match)
 
-        table.insert(s.extmarks, make_extmark(abs_row, pos_start))
-        del_text(abs_row, pos_start, pos_end)
+        table.insert(s.extmarks, make_extmark(s.bufnr, abs_row, pos_start))
+        del_text(s.bufnr, abs_row, pos_start, pos_end)
     end
+
     if final then
         table.insert(s.extmarks, final)
     end
 
-    del_text(s.row, trigger_start, trigger_end)
+    del_text(s.bufnr, s.row, trigger_start, trigger_end)
 
     augroup("autocmd InsertLeave * lua require'minsnip'.reset()")
     s.jumping = true
@@ -223,17 +225,12 @@ M.jump_backwards = function()
     return jump(-1)
 end
 
-M.setup = function(user_snippets)
-    for k, v in pairs(user_snippets) do
-        snippets[k] = v
-    end
-end
-
 M.expand_anonymous = function(body)
     initialize_state()
 
     api.nvim_buf_set_text(s.bufnr, s.row - 1, s.col, s.row - 1, s.col, { anon_trigger })
     api.nvim_win_set_cursor(0, { s.row, s.col + #anon_trigger })
+
     snippets[anon_trigger] = function()
         snippets[anon_trigger] = nil
         return body
@@ -245,6 +242,12 @@ end
 M.expand_by_name = function(name)
     local snippet = can_expand(name)
     return snippet and expand(snippet) or false
+end
+
+M.setup = function(user_snippets)
+    for k, v in pairs(user_snippets) do
+        snippets[k] = v
+    end
 end
 
 M.reset = reset
