@@ -198,7 +198,7 @@ cmp.setup({
     mapping = {
         ["<Tab>"] = function(fallback)
             if vim.fn.pumvisible() == 1 then
-                vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<C-p>", true, true, true), "n")
+                vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<C-n>", true, true, true), "n")
             elseif not minsnip.jump() then
                 fallback()
             end
