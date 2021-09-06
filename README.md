@@ -224,9 +224,7 @@ Note the following limitations:
 
 ## Examples
 
-Take a look at my
-[snippets](https://github.com/jose-elias-alvarez/dotfiles/blob/main/.config/nvim/lua/snippets.lua)
-for examples of the wrappers I use to simplify snippet creation.
+See [this file](doc/examples.lua) for examples.
 
 ## Testing
 
