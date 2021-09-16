@@ -173,55 +173,6 @@ local snippets = {
 Instead of filling the plugin with features you _might_ use, Minsnip's goal is
 to let you focus on writing the snippets you _want_ to use.
 
-## nvim-cmp integration
-
-Minsnip provides a minimal integration with
-[nvim-cmp](https://github.com/hrsh7th/nvim-cmp). The following code block shows
-how to set it up, with example mappings for `<Tab>` and `<S-Tab>`:
-
-```lua
-local cmp = require("cmp")
-local minsnip = require("minsnip")
-
-cmp.setup({
-    -- required
-    snippet = {
-        expand = function(args)
-            minsnip.expand_anonymous(args.body)
-        end,
-    },
-    -- add to the other sources you're using
-    sources = {
-        { name = "minsnip" },
-    },
-    -- optional
-    mapping = {
-        ["<Tab>"] = function(fallback)
-            if vim.fn.pumvisible() == 1 then
-                vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<C-n>", true, true, true), "n")
-            elseif not minsnip.jump() then
-                fallback()
-            end
-        end,
-        ["<S-Tab>"] = function(fallback)
-            if vim.fn.pumvisible() == 1 then
-                vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<C-p>", true, true, true), "n")
-            elseif not minsnip.jump_backwards() then
-                fallback()
-            end
-        end,
-    },
-})
-```
-
-Note the following limitations:
-
-- The popup menu always shows all registered snippets, since Minsnip can't
-  determine whether a snippet is valid for the current filetype without
-  expanding it (which could cause side effects).
-- Minsnip ignores placeholders in LSP snippets and can't handle nested
-  placeholders.
-
 ## Examples
 
 See [this file](doc/examples.lua) for examples.

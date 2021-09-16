@@ -1,3 +1,4 @@
+-- NOTE: this integration is deprecated (it theoretically works, but I'm not using cmp anymore and won't be maintaining this)
 local cmp = require("cmp")
 
 local source = {}
