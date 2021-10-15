@@ -5,6 +5,12 @@
 }
 -->
 
+# ARCHIVED
+
+I'm no longer using minsnip, so I'm archiving this repository. To my knowledge,
+it works as expected, so feel free to use it as-is or use it as a basis for your
+own snippet solution.
+
 # minsnip.nvim
 
 An aggressively minimalistic snippet plugin.
