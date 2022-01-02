@@ -181,44 +181,6 @@ describe("minsnip", function()
         end)
     end)
 
-    describe("expand_anonymous", function()
-        before_each(function()
-            api.nvim_set_keymap("i", "<M-Tab>", "<cmd> lua require'minsnip'.expand_anonymous('print($0)')<CR>", {})
-        end)
-        after_each(function()
-            api.nvim_del_keymap("i", "<M-Tab>")
-        end)
-
-        it("should expand anonymous snippet", function()
-            input("i<M-Tab>")
-
-            vim.wait(0)
-
-            assert_content({ "print()" })
-            assert_cursor_at(1, 6)
-        end)
-    end)
-
-    describe("expand_by_name", function()
-        before_each(function()
-            api.nvim_set_keymap("i", "<M-Tab>", "<cmd> lua require'minsnip'.expand_by_name('print')<CR>", {})
-
-            add_snippets({ print = luasnip("print($0)") })
-        end)
-        after_each(function()
-            api.nvim_del_keymap("i", "<M-Tab>")
-        end)
-
-        it("should expand snippet by name", function()
-            input("i<M-Tab>")
-
-            vim.wait(0)
-
-            assert_content({ "print()" })
-            assert_cursor_at(1, 6)
-        end)
-    end)
-
     describe("jump", function()
         it("should jump forwards", function()
             add_snippets({ print = luasnip("print($1, $0)") })

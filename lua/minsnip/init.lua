@@ -3,7 +3,6 @@ local api = vim.api
 local namespace = api.nvim_create_namespace("minsnip")
 
 local snippets = {}
-local ANON_TRIGGER = "_anon"
 
 -- utils
 local del_text = function(bufnr, row, start_col, end_col)
@@ -223,25 +222,6 @@ end
 
 M.jump_backwards = function()
     return can_jump(s.jump_index - 1) and jump(-1)
-end
-
-M.expand_anonymous = function(body)
-    initialize_state()
-
-    api.nvim_buf_set_text(s.bufnr, s.row - 1, s.col, s.row - 1, s.col, { ANON_TRIGGER })
-    api.nvim_win_set_cursor(0, { s.row, s.col + #ANON_TRIGGER })
-
-    snippets[ANON_TRIGGER] = function()
-        snippets[ANON_TRIGGER] = nil
-        return body
-    end
-
-    return M.jump()
-end
-
-M.expand_by_name = function(name)
-    local snippet = can_expand(name)
-    return snippet and expand(snippet) or false
 end
 
 M.setup = function(user_snippets)
