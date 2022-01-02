@@ -1,7 +1,7 @@
 local api = vim.api
 
+local trigger_regex = vim.regex("\\k*$")
 local namespace = api.nvim_create_namespace("minsnip")
-
 local snippets = {}
 
 -- utils
@@ -27,19 +27,7 @@ local augroup = function(autocmd)
 end
 
 local resolve_trigger = function(col, line)
-    local trigger = ""
-    -- iterate backwards from cursor position until non-alphanumeric char is found
-    for i = col, 0, -1 do
-        local char = line:sub(i, i)
-        if char:match("%W") and char ~= "_" then
-            break
-        end
-
-        trigger = trigger .. char
-    end
-
-    -- reverse to account for backwards iteration
-    return trigger:reverse()
+    return line:sub(trigger_regex:match_str(line:sub(1, col)) + 1, col)
 end
 
 local has_final = function(positions)
