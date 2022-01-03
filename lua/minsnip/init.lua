@@ -116,20 +116,13 @@ local expand = function(snippet)
 
     local positions, adjusted = {}, {}
     for split_row, split_text in ipairs(split) do
-        local match_from_pattern = function(pattern)
-            for match in split_text:gmatch(pattern) do
-                table.insert(positions, {
-                    match = match,
-                    row = split_row,
-                    index = tonumber(match:match("%d+")),
-                })
-            end
+        for match in split_text:gmatch("%$%d+") do
+            table.insert(positions, {
+                match = match,
+                row = split_row,
+                index = tonumber(match:match("%d+")),
+            })
         end
-
-        -- normal positions ($0, $1)
-        match_from_pattern("%$%d+")
-        -- positions with placeholders (${1:placeholder})
-        match_from_pattern("%${%d+:%w+}")
 
         -- adjust to account for [[]] snippet indentation
         if snip_indent then
