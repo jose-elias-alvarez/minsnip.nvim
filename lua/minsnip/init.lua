@@ -13,19 +13,6 @@ local make_extmark = function(bufnr, row, col)
     return api.nvim_buf_set_extmark(bufnr, namespace, row - 1, col - 1, {})
 end
 
-local augroup = function(autocmd)
-    api.nvim_exec(
-        string.format(
-            [[augroup Minsnip
-                autocmd!
-                %s
-            augroup END]],
-            autocmd or ""
-        ),
-        false
-    )
-end
-
 local resolve_trigger = function(col, line)
     return line:sub(trigger_regex:match_str(line:sub(1, col)) + 1, col)
 end
@@ -62,7 +49,6 @@ local reset = function(force)
         return
     end
     api.nvim_buf_clear_namespace(s.bufnr, namespace, 0, -1)
-    augroup(nil)
 
     s = vim.deepcopy(initial_state)
 end
@@ -172,7 +158,7 @@ local expand = function(snippet)
 
     del_text(s.bufnr, s.row, trigger_start, trigger_end)
 
-    augroup("autocmd InsertLeave * lua require'minsnip'.reset()")
+    vim.cmd("autocmd InsertLeave * ++once lua require'minsnip'.reset()")
     s.jumping = true
     jump()
 
